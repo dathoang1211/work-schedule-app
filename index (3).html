@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Quản Lý Lịch Làm Việc</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Sora',sans-serif}
+body{background:#f0fdf4;height:100vh;overflow:hidden}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#f1f5f9}
+::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}
+.app-layout{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:240px;background:#134e4a;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-logo{padding:20px 16px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.sidebar-logo img{width:36px;height:36px;object-fit:contain;border-radius:8px}
+.sidebar-logo h1{color:#fff;font-size:14px;font-weight:700;margin-top:8px;line-height:1.3}
+.sidebar-logo p{color:#99f6e4;font-size:11px;margin-top:2px}
+.nav-section{padding:16px 8px}
+.nav-label{color:#5eead4;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;color:#ccfbf1;font-size:13px;font-weight:500;transition:all 0.15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,0.1);color:#fff}
+.nav-item.active{background:#0f766e;color:#fff;box-shadow:0 2px 8px rgba(15,118,110,0.4)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.nav-badge{background:#f59e0b;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto}
+.main-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.top-bar{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.top-bar h2{font-size:16px;font-weight:700;color:#134e4a}
+.top-bar-actions{display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s;white-space:nowrap}
+.btn-primary{background:#0f766e;color:#fff;border-color:#0f766e}
+.btn-primary:hover{background:#0d6b63}
+.btn-secondary{background:#fff;color:#374151;border-color:#d1d5db}
+.btn-secondary:hover{background:#f9fafb}
+.btn-accent{background:#f59e0b;color:#fff;border-color:#f59e0b}
+.btn-accent:hover{background:#d97706}
+.btn-danger{background:#ef4444;color:#fff;border-color:#ef4444}
+.btn-danger:hover{background:#dc2626}
+.btn-sm{padding:6px 10px;font-size:11px}
+.btn svg{width:14px;height:14px}
+.page{flex:1;overflow-y:auto;padding:20px}
+.card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:16px}
+.card-header{padding:14px 18px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:14px;font-weight:700;color:#0f172a}
+.card-body{padding:18px}
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);animation:slideUp 0.3s ease}
+.toast-success{background:#0f766e;color:#fff}
+.toast-error{background:#ef4444;color:#fff}
+.toast-info{background:#3b82f6;color:#fff}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:16px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.modal-lg{max-width:680px}
+.modal-md{max-width:480px}
+.modal-header{padding:18px 22px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1}
+.modal-header h3{font-size:16px;font-weight:700;color:#0f172a}
+.modal-body{padding:22px}
+.modal-footer{padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:8px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;display:block}
+.form-control{width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Sora',sans-serif;color:#0f172a;transition:border 0.15s}
+.form-control:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,0.1)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* Calendar styles */
+.cal-nav{display:flex;align-items:center;gap:12px}
+.cal-nav-title{font-size:16px;font-weight:700;color:#0f172a;min-width:180px;text-align:center}
+.cal-nav-btn{width:32px;height:32px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#374151;transition:all 0.15s}
+.cal-nav-btn:hover{background:#f0fdf4;border-color:#0f766e;color:#0f766e}
+.view-toggle{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;gap:2px}
+.view-btn{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:none;color:#64748b;transition:all 0.15s}
+.view-btn.active{background:#fff;color:#0f766e;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+/* Month calendar */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+.cal-header-cell{background:#134e4a;color:#ccfbf1;font-size:11px;font-weight:700;text-align:center;padding:10px 4px;text-transform:uppercase;letter-spacing:0.5px}
+.cal-header-cell.sunday{color:#fde68a}
+.cal-day{border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;min-height:110px;padding:6px;position:relative;background:#fff;transition:background 0.1s;vertical-align:top}
+.cal-day:nth-child(7n){border-right:none}
+.cal-day.other-month{background:#f8fafc}
+.cal-day.today{background:#f0fdf4}
+.cal-day.sunday-col{background:#fffbeb}
+.cal-day-num{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%}
+.cal-day.today .cal-day-num{background:#0f766e;color:#fff}
+.cal-day.other-month .cal-day-num{color:#cbd5e1}
+.shift-pill{display:flex;align-items:center;gap:4px;padding:3px 6px;border-radius:5px;font-size:10px;font-weight:700;margin-bottom:2px;cursor:pointer;transition:opacity 0.1s}
+.shift-pill:hover{opacity:0.8}
+.shift-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* Week view */
+.week-grid{display:grid;grid-template-columns:160px repeat(7,1fr);border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+.week-header{background:#134e4a;color:#ccfbf1;font-size:11px;font-weight:700;text-align:center;padding:10px 6px}
+.week-header.sunday{color:#fde68a}
+.week-emp-cell{padding:8px 10px;background:#f8fafc;border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#374151}
+.week-emp-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.week-shift-cell{padding:6px 4px;border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;text-align:center;cursor:pointer;transition:background 0.1s}
+.week-shift-cell:hover{background:#f0fdf4}
+.week-shift-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700}
+/* Shift summary */
+.shift-summary-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.shift-tag{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700}
+/* Attendance table */
+.att-table{width:100%;border-collapse:collapse;font-size:13px}
+.att-table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0}
+.att-table td{padding:10px 12px;border-bottom:1px solid #f1f5f9;color:#374151;vertical-align:middle}
+.att-table tr:hover td{background:#f8fafc}
+.status-badge{padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700}
+/* Stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px 16px}
+.stat-label{font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px}
+.stat-value{font-size:24px;font-weight:700;color:#0f172a}
+.stat-sub{font-size:11px;color:#94a3b8;margin-top:2px}
+/* Employee cards */
+.emp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.emp-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px;cursor:pointer;transition:all 0.15s}
+.emp-card:hover{border-color:#0f766e;box-shadow:0 4px 16px rgba(15,118,110,0.1);transform:translateY(-1px)}
+.emp-avatar-lg{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;margin-bottom:12px}
+.emp-name{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px}
+.emp-role{font-size:12px;color:#64748b}
+.emp-stats{display:flex;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9}
+.emp-stat{text-align:center}
+.emp-stat-val{font-size:16px;font-weight:700;color:#0f766e}
+.emp-stat-label{font-size:10px;color:#94a3b8}
+/* Shift config */
+.shift-config-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.shift-color-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.shift-info{flex:1}
+.shift-info-name{font-size:14px;font-weight:700;color:#0f172a}
+.shift-info-time{font-size:12px;color:#64748b;margin-top:2px}
+/* Email modal */
+.email-schedule-item{background:#f8fafc;border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;border:1px solid #e2e8f0}
+.progress-bar{height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:#0f766e;border-radius:2px;transition:width 0.3s}
+/* Color picker */
+.color-swatches{display:flex;gap:6px;flex-wrap:wrap}
+.color-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform 0.1s}
+.color-swatch.active{border-color:#0f172a;transform:scale(1.2)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect,useCallback,useMemo}=React;
+
+/* ============ CONSTANTS ============ */
+const SHIFTS={
+  C1:{label:'Ca 1 (Sáng)',time:'06:00-14:00',bg:'#dbeafe',text:'#1d4ed8',dot:'#3b82f6'},
+  T:{label:'Ca Trưa',time:'10:00-18:00',bg:'#d1fae5',text:'#065f46',dot:'#10b981'},
+  'O/NT':{label:'Ca Tối/Đêm',time:'18:00-02:00',bg:'#ede9fe',text:'#5b21b6',dot:'#8b5cf6'},
+  C2:{label:'Ca 2 (Chiều)',time:'08:00-17:00',bg:'#fef3c7',text:'#92400e',dot:'#f59e0b'},
+  OFF:{label:'Nghỉ',time:'',bg:'#f1f5f9',text:'#64748b',dot:'#94a3b8'},
+};
+const DAYS=['CN','T2','T3','T4','T5','T6','T7'];
+const DAYS_FULL=['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+const MONTHS=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+const COLORS=['#3b82f6','#10b981','#8b5cf6','#f59e0b','#ef4444','#ec4899','#06b6d4','#f97316','#6366f1','#84cc16'];
+
+const DEFAULT_EMPLOYEES=[
+  {id:1,name:'Nguyễn Văn An',email:'an@company.vn',phone:'0901 234 567',position:'Nhân viên',dept:'Bộ phận A',color:'#3b82f6',avatar:'A'},
+  {id:2,name:'Trần Thị Bình',email:'binh@company.vn',phone:'0901 234 568',position:'Tổ trưởng',dept:'Bộ phận A',color:'#10b981',avatar:'B'},
+  {id:3,name:'Lê Văn Cường',email:'cuong@company.vn',phone:'0901 234 569',position:'Nhân viên',dept:'Bộ phận B',color:'#8b5cf6',avatar:'C'},
+  {id:4,name:'Phạm Thị Dung',email:'dung@company.vn',phone:'0901 234 570',position:'Nhân viên',dept:'Bộ phận B',color:'#f59e0b',avatar:'D'},
+  {id:5,name:'Hoàng Văn Em',email:'em@company.vn',phone:'0901 234 571',position:'Nhân viên',dept:'Bộ phận A',color:'#ef4444',avatar:'E'},
+  {id:6,name:'Vũ Thị Phương',email:'phuong@company.vn',phone:'0901 234 572',position:'Nhân viên',dept:'Bộ phận C',color:'#ec4899',avatar:'P'},
+  {id:7,name:'Đỗ Minh Tuấn',email:'tuan@company.vn',phone:'0901 234 573',position:'Nhân viên',dept:'Bộ phận C',color:'#06b6d4',avatar:'T'},
+];
+
+const DEFAULT_SHIFT_CONFIG=[
+  {id:'C1',name:'Ca 1 (Sáng)',start:'06:00',end:'14:00',color:'#3b82f6',minStaff:1,maxStaff:3},
+  {id:'T',name:'Ca Trưa',start:'10:00',end:'18:00',color:'#10b981',minStaff:1,maxStaff:2},
+  {id:'O/NT',name:'Ca Tối/Đêm',start:'18:00',end:'02:00',color:'#8b5cf6',minStaff:1,maxStaff:2},
+  {id:'C2',name:'Ca 2 (Chiều)',start:'08:00',end:'17:00',color:'#f59e0b',minStaff:1,maxStaff:5},
+];
+
+/* ============ HELPERS ============ */
+function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate()}
+function getDateKey(y,m,d){return`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+function parseKey(k){const[y,m,d]=k.split('-');return{year:+y,month:+m-1,day:+d}}
+function today(){return new Date()}
+
+function getCalendarDays(y,m){
+  const first=new Date(y,m,1).getDay();
+  const dim=getDaysInMonth(y,m);
+  const dipm=getDaysInMonth(y,m-1);
+  const offset=first===0?6:first-1;
+  const days=[];
+  for(let i=offset-1;i>=0;i--) days.push({day:dipm-i,month:m===0?m-1:m-1,year:m===0?y-1:y,cur:false});
+  for(let d=1;d<=dim;d++) days.push({day:d,month:m,year:y,cur:true});
+  while(days.length<42) days.push({day:days.length-offset-dim+1,month:m===11?0:m+1,year:m===11?y+1:y,cur:false});
+  return days;
+}
+
+function getWeekDays(date){
+  const d=new Date(date);
+  const dow=d.getDay();
+  const diff=dow===0?-6:1-dow;
+  d.setDate(d.getDate()+diff);
+  return Array.from({length:7},(_,i)=>{const c=new Date(d);c.setDate(d.getDate()+i);return{day:c.getDate(),month:c.getMonth(),year:c.getFullYear(),cur:c.getMonth()===date.getMonth()}});
+}
+
+function shuffle(arr){return [...arr].sort(()=>Math.random()-0.5)}
+
+function generateAutoSchedule(employees,year,month){
+  const dim=getDaysInMonth(year,month);
+  const schedule={};
+  const allDays=Array.from({length:dim},(_,i)=>({day:i+1,dow:new Date(year,month,i+1).getDay()}));
+  const monSat=allDays.filter(d=>d.dow!==0);
+  const suns=allDays.filter(d=>d.dow===0);
+  const W=monSat.length;
+  const N=employees.length;
+
+  const empShifts={};
+  employees.forEach(e=>empShifts[e.id]=0);
+
+  // Off day tracking for Mon-Sat
+  const offMap={};
+  employees.forEach(e=>offMap[e.id]=new Set());
+
+  if(W>26){
+    const extra=W-26;
+    employees.forEach(e=>{
+      const sh=shuffle(monSat).slice(0,extra);
+      sh.forEach(d=>offMap[e.id].add(d.day));
+    });
+  }
+
+  // Role rotation tracking
+  const roleRot={C1:0,T:0,'O/NT':0};
+
+  monSat.forEach(({day})=>{
+    const key=getDateKey(year,month,day);
+    const working=employees.filter(e=>!offMap[e.id].has(day));
+    const off=employees.filter(e=>offMap[e.id].has(day));
+    const sh=shuffle(working);
+    const daySchedule={};
+    const roles=['C1','T','O/NT'];
+    sh.forEach((e,i)=>{
+      daySchedule[e.id]=i<3?roles[i]:'C2';
+      empShifts[e.id]++;
+    });
+    off.forEach(e=>{daySchedule[e.id]='OFF'});
+    schedule[key]=daySchedule;
+  });
+
+  // Sunday rotation - pick 3 employees with fewest Sunday shifts
+  const sunCount={};
+  employees.forEach(e=>sunCount[e.id]=0);
+
+  suns.forEach(({day})=>{
+    const key=getDateKey(year,month,day);
+    // If W<26 pick employees who need more shifts, otherwise rotate fairly
+    const sorted=[...employees].sort((a,b)=>{
+      if(W<26) return empShifts[a.id]-empShifts[b.id];
+      return sunCount[a.id]-sunCount[b.id];
+    });
+    const picks=sorted.slice(0,3);
+    const daySchedule={};
+    const sunRoles=['C2','T','O/NT'];
+    picks.forEach((e,i)=>{
+      daySchedule[e.id]=sunRoles[i];
+      sunCount[e.id]++;
+      empShifts[e.id]++;
+    });
+    employees.filter(e=>!picks.find(p=>p.id===e.id)).forEach(e=>{daySchedule[e.id]='OFF'});
+    schedule[key]=daySchedule;
+  });
+
+  return schedule;
+}
+
+/* ============ ICON COMPONENTS ============ */
+const Icon=({name,size=16})=>{
+  const icons={
+    calendar:`<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>`,
+    users:`<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>`,
+    clock:`<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
+    settings:`<path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>`,
+    chevLeft:`<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>`,
+    chevRight:`<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>`,
+    download:`<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>`,
+    mail:`<path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>`,
+    shuffle:`<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>`,
+    plus:`<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>`,
+    edit:`<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>`,
+    trash:`<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>`,
+    x:`<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>`,
+    check:`<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>`,
+    bell:`<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>`,
+    send:`<path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>`,
+    history:`<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
+    chart:`<path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>`,
+    info:`<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
+  };
+  return(
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" dangerouslySetInnerHTML={{__html:icons[name]||''}}/>
+  );
+};
+
+/* ============ TOAST ============ */
+function Toast({msg,type,onClose}){
+  useEffect(()=>{const t=setTimeout(onClose,3500);return()=>clearTimeout(t)},[]);
+  return(
+    <div className={`toast toast-${type}`}>
+      <Icon name={type==='success'?'check':type==='error'?'x':'info'} size={14}/>
+      {msg}
+    </div>
+  );
+}
+
+/* ============ SHIFT PILL ============ */
+function ShiftPill({shift,empName,onClick}){
+  const s=SHIFTS[shift]||SHIFTS.OFF;
+  return(
+    <div className="shift-pill" style={{background:s.bg,color:s.text}} onClick={onClick}>
+      <div className="shift-dot" style={{background:s.dot}}/>
+      <span style={{maxWidth:80,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{empName?`${empName.split(' ').pop()}`:shift}</span>
+    </div>
+  );
+}
+
+/* ============ SCHEDULE MODULE ============ */
+function ScheduleModule({employees,schedule,setSchedule,shiftConfig,showToast}){
+  const [viewMode,setViewMode]=useState('month');
+  const [curDate,setCurDate]=useState(new Date(2026,3,1));
+  const [showEmailModal,setShowEmailModal]=useState(false);
+  const [isGen,setIsGen]=useState(false);
+  const [selectedCell,setSelectedCell]=useState(null);
+  const [emailJobs,setEmailJobs]=useState([
+    {id:1,to:'all',scheduledAt:new Date(2026,3,1,8,0),status:'pending',subject:'Lịch làm việc Tháng 4/2026'},
+  ]);
+  const calRef=useRef(null);
+
+  const y=curDate.getFullYear(), m=curDate.getMonth();
+
+  const handleAutoSchedule=()=>{
+    setIsGen(true);
+    setTimeout(()=>{
+      const s=generateAutoSchedule(employees,y,m);
+      setSchedule(s);
+      setIsGen(false);
+      showToast('Đã xếp lịch tự động thành công!','success');
+    },900);
+  };
+
+  const navigate=dir=>{
+    const d=new Date(curDate);
+    if(viewMode==='month') d.setMonth(d.getMonth()+dir);
+    else d.setDate(d.getDate()+7*dir);
+    setCurDate(d);
+  };
+
+  const getShift=(empId,day,month,year)=>{
+    const key=getDateKey(year,month,day);
+    return schedule[key]?.[empId]||'OFF';
+  };
+
+  const setShift=(empId,day,month,year,shift)=>{
+    const key=getDateKey(year,month,day);
+    setSchedule(prev=>({...prev,[key]:{...(prev[key]||{}), [empId]:shift}}));
+  };
+
+  // Count shifts per employee for the current month
+  const empShiftCounts=useMemo(()=>{
+    const counts={};
+    employees.forEach(e=>{counts[e.id]={total:0,C1:0,T:0,'O/NT':0,C2:0,OFF:0}});
+    const dim=getDaysInMonth(y,m);
+    for(let d=1;d<=dim;d++){
+      const key=getDateKey(y,m,d);
+      if(schedule[key]){
+        employees.forEach(e=>{
+          const sh=schedule[key][e.id]||'OFF';
+          counts[e.id][sh]=(counts[e.id][sh]||0)+1;
+          if(sh!=='OFF') counts[e.id].total++;
+        });
+      }
+    }
+    return counts;
+  },[schedule,y,m,employees]);
+
+  const handleExportImage=()=>{
+    showToast('Đang tạo ảnh chất lượng cao...','info');
+    const scale=4;
+    const W=2400, H=1600;
+    const canvas=document.createElement('canvas');
+    canvas.width=W*scale; canvas.height=H*scale;
+    const ctx=canvas.getContext('2d');
+    ctx.scale(scale,scale);
+
+    const shiftColors={C1:'#3b82f6',T:'#10b981','O/NT':'#8b5cf6',C2:'#f59e0b',OFF:'#e2e8f0'};
+    const shiftBg={C1:'#dbeafe',T:'#d1fae5','O/NT':'#ede9fe',C2:'#fef3c7',OFF:'#f8fafc'};
+
+    // Background
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,W,H);
+
+    // Header
+    const gradH=ctx.createLinearGradient(0,0,W,0);
+    gradH.addColorStop(0,'#134e4a');
+    gradH.addColorStop(1,'#0f766e');
+    ctx.fillStyle=gradH;
+    ctx.fillRect(0,0,W,90);
+
+    // Load logo then draw rest
+    const logoImg=new Image();
+    logoImg.crossOrigin='anonymous';
+    logoImg.onload=()=>{
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(40,45,28,0,Math.PI*2);
+      ctx.clip();
+      ctx.drawImage(logoImg,12,17,56,56);
+      ctx.restore();
+
+      drawCalendar(ctx,W,H,scale,shiftColors,shiftBg);
+    };
+    logoImg.onerror=()=>{
+      // Draw text logo if image fails
+      ctx.fillStyle='#99f6e4';
+      ctx.font='bold 28px Arial';
+      ctx.fillText('🏢',24,56);
+      drawCalendar(ctx,W,H,scale,shiftColors,shiftBg);
+    };
+    logoImg.src='https://i.postimg.cc/C5Wxpbrw/download.png';
+
+    function drawCalendar(ctx,W,H,scale,shiftColors,shiftBg){
+      // Title
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold 36px Arial';
+      ctx.fillText('LỊCH LÀM VIỆC',80,42);
+      ctx.font='18px Arial';
+      ctx.fillStyle='#99f6e4';
+      ctx.fillText(`${MONTHS[m]} ${y} | Hệ thống quản lý ca`,80,68);
+
+      // Date generated
+      ctx.fillStyle='#ccfbf1';
+      ctx.font='13px Arial';
+      ctx.textAlign='right';
+      ctx.fillText(`Xuất ngày: ${new Date().toLocaleDateString('vi-VN')}`,W-20,55);
+      ctx.textAlign='left';
+
+      // Legend
+      let lx=W-480, ly=110;
+      Object.entries({C1:'Ca 1 (Sáng)',T:'Ca Trưa','O/NT':'Ca Tối/Đêm',C2:'Ca 2 (Chiều)'}).forEach(([k,label])=>{
+        ctx.fillStyle=shiftColors[k];
+        ctx.beginPath();ctx.arc(lx+8,ly+8,7,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#374151';
+        ctx.font='13px Arial';
+        ctx.fillText(`${k}: ${label}`,lx+20,ly+13);
+        lx+=120;
+      });
+
+      // Calendar grid
+      const days=['CN','T2','T3','T4','T5','T6','T7'];
+      const colW=(W-20)/8, rowH=60;
+      const startX=10, startY=140;
+
+      // Emp column header
+      ctx.fillStyle='#134e4a';
+      ctx.fillRect(startX,startY,colW-5,40);
+      ctx.fillStyle='#ccfbf1';
+      ctx.font='bold 14px Arial';
+      ctx.textAlign='center';
+      ctx.fillText('NHÂN VIÊN',startX+colW/2,startY+26);
+
+      // Day headers
+      const calDays=getCalendarDays(y,m);
+      const weeks=[];
+      for(let i=0;i<calDays.length;i+=7) weeks.push(calDays.slice(i,i+7));
+
+      // Just show 4 weeks max
+      const numWeeks=Math.min(weeks.length,6);
+      const dRowH=(H-startY-50)/Math.max(employees.length+1,8);
+      const dColW=(W-startX-colW)/(numWeeks);
+
+      // Week headers
+      weeks.slice(0,numWeeks).forEach((week,wi)=>{
+        const x=startX+colW+wi*dColW;
+        ctx.fillStyle='#0f766e';
+        ctx.fillRect(x,startY,dColW-3,40);
+        ctx.fillStyle='#ffffff';
+        ctx.font='bold 12px Arial';
+        ctx.textAlign='center';
+        const dates=week.map(d=>d.day).join(',');
+        ctx.fillText(`Tuần ${wi+1}`,x+dColW/2,startY+26);
+      });
+
+      // Employee rows
+      employees.forEach((emp,ei)=>{
+        const ry=startY+40+ei*(dRowH||60);
+        // Emp name cell
+        ctx.fillStyle=ei%2===0?'#f8fafc':'#ffffff';
+        ctx.fillRect(startX,ry,colW-5,dRowH||60);
+        ctx.fillStyle=emp.color;
+        ctx.beginPath();ctx.arc(startX+20,ry+(dRowH||60)/2,12,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#ffffff';
+        ctx.font='bold 12px Arial';
+        ctx.textAlign='center';
+        ctx.fillText(emp.avatar,startX+20,ry+(dRowH||60)/2+5);
+        ctx.fillStyle='#0f172a';
+        ctx.font='bold 13px Arial';
+        ctx.textAlign='left';
+        const shortName=emp.name.split(' ').slice(-2).join(' ');
+        ctx.fillText(shortName,startX+38,ry+(dRowH||60)/2-3);
+        ctx.fillStyle='#64748b';
+        ctx.font='11px Arial';
+        ctx.fillText(`${empShiftCounts[emp.id]?.total||0}/26 công`,startX+38,ry+(dRowH||60)/2+12);
+
+        // Week cells
+        weeks.slice(0,numWeeks).forEach((week,wi)=>{
+          const cx=startX+colW+wi*dColW;
+          ctx.fillStyle=ei%2===0?'#f8fafc':'#ffffff';
+          ctx.fillRect(cx,ry,dColW-3,dRowH||60);
+
+          // Show shifts for the week
+          week.forEach((dayObj,di)=>{
+            if(!dayObj.cur) return;
+            const shift=getShift(emp.id,dayObj.day,dayObj.month,dayObj.year);
+            if(shift&&shift!=='OFF'){
+              const sx=cx+di*(dColW/7)+2;
+              ctx.fillStyle=shiftBg[shift]||'#f8fafc';
+              ctx.fillRect(sx,ry+4,dColW/7-4,(dRowH||60)-8);
+              ctx.fillStyle=shiftColors[shift];
+              ctx.font='bold 10px Arial';
+              ctx.textAlign='center';
+              ctx.fillText(shift,sx+(dColW/7-4)/2,ry+(dRowH||60)/2+4);
+              ctx.fillStyle='#374151';
+              ctx.font='9px Arial';
+              ctx.fillText(dayObj.day,sx+(dColW/7-4)/2,ry+(dRowH||60)/2-6);
+            }
+          });
+        });
+      });
+
+      // Footer
+      ctx.fillStyle='#134e4a';
+      ctx.fillRect(0,H-40,W,40);
+      ctx.fillStyle='#99f6e4';
+      ctx.font='13px Arial';
+      ctx.textAlign='center';
+      ctx.fillText('Hệ thống Quản lý Lịch làm việc | Xuất chất lượng 4K',W/2,H-15);
+
+      // Download
+      try{
+        canvas.toBlob(blob=>{
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.download=`lich-lam-viec-${y}-${m+1}.png`;
+          a.href=url;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('Đã xuất ảnh 4K thành công!','success');
+        },'image/png',1.0);
+      }catch(e){showToast('Lỗi khi xuất ảnh','error')}
+    }
+  };
+
+  const calDays=getCalendarDays(y,m);
+  const weekDays=getWeekDays(curDate);
+
+  const titleStr=viewMode==='month'
+    ?`${MONTHS[m]} ${y}`
+    :`Tuần: ${weekDays[0].day}/${weekDays[0].month+1} - ${weekDays[6].day}/${weekDays[6].month+1}/${y}`;
+
+  return(
+    <div className="page">
+      {/* Summary stats */}
+      <div className="stats-grid" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+        <div className="stat-card">
+          <div className="stat-label">Tổng nhân viên</div>
+          <div className="stat-value" style={{color:'#0f766e'}}>{employees.length}</div>
+          <div className="stat-sub">đang hoạt động</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Đã xếp lịch</div>
+          <div className="stat-value" style={{color:'#3b82f6'}}>{Object.keys(schedule).filter(k=>{const{month,year}=parseKey(k);return month===m&&year===y}).length}</div>
+          <div className="stat-sub">ngày trong tháng</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Mục tiêu/người</div>
+          <div className="stat-value" style={{color:'#8b5cf6'}}>26</div>
+          <div className="stat-sub">công/tháng</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Trạng thái</div>
+          <div className="stat-value" style={{color:Object.keys(schedule).filter(k=>{const{month,year}=parseKey(k);return month===m&&year===y}).length>0?'#10b981':'#f59e0b',fontSize:14,fontWeight:700,paddingTop:4}}>
+            {Object.keys(schedule).filter(k=>{const{month,year}=parseKey(k);return month===m&&year===y}).length>0?'✓ Đã xếp lịch':'⏳ Chưa xếp'}
+          </div>
+          <div className="stat-sub">{MONTHS[m]}</div>
+        </div>
+      </div>
+
+      {/* Calendar card */}
+      <div className="card">
+        <div className="card-header">
+          <div className="cal-nav">
+            <div className="view-toggle">
+              <button className={`view-btn${viewMode==='month'?' active':''}`} onClick={()=>setViewMode('month')}>Tháng</button>
+              <button className={`view-btn${viewMode==='week'?' active':''}`} onClick={()=>setViewMode('week')}>Tuần</button>
+            </div>
+            <button className="cal-nav-btn" onClick={()=>navigate(-1)}><Icon name="chevLeft" size={14}/></button>
+            <span className="cal-nav-title">{titleStr}</span>
+            <button className="cal-nav-btn" onClick={()=>navigate(1)}><Icon name="chevRight" size={14}/></button>
+            <button className="btn btn-secondary btn-sm" onClick={()=>setCurDate(new Date(2026,3,1))}>Hôm nay</button>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-secondary btn-sm" onClick={handleAutoSchedule} disabled={isGen} style={{gap:6}}>
+              {isGen?<span style={{display:'inline-block',animation:'spin 1s linear infinite',fontSize:12}}>⟳</span>:<Icon name="shuffle" size={12}/>}
+              {isGen?'Đang xếp...':'Xếp lịch tự động'}
+            </button>
+            <button className="btn btn-accent btn-sm" onClick={handleExportImage}>
+              <Icon name="download" size={12}/>Xuất ảnh 4K
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={()=>setShowEmailModal(true)}>
+              <Icon name="mail" size={12}/>Gửi thông báo
+            </button>
+          </div>
+        </div>
+
+        <div style={{padding:'12px 16px',borderBottom:'1px solid #f1f5f9'}}>
+          <div className="shift-summary-bar">
+            {Object.entries(SHIFTS).filter(([k])=>k!=='OFF').map(([k,s])=>(
+              <div key={k} className="shift-tag" style={{background:s.bg,color:s.text}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:s.dot}}/>
+                {k}: {s.label} ({s.time})
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div ref={calRef} style={{overflowX:'auto'}}>
+          {viewMode==='month'?(
+            <MonthView calDays={calDays} employees={employees} schedule={schedule} setShift={setShift} y={y} m={m} empShiftCounts={empShiftCounts} selectedCell={selectedCell} setSelectedCell={setSelectedCell}/>
+          ):(
+            <WeekView weekDays={weekDays} employees={employees} schedule={schedule} setShift={setShift} empShiftCounts={empShiftCounts}/>
+          )}
+        </div>
+      </div>
+
+      {/* Shift count summary */}
+      <ShiftCountTable employees={employees} empShiftCounts={empShiftCounts}/>
+
+      {showEmailModal&&<EmailModal employees={employees} emailJobs={emailJobs} setEmailJobs={setEmailJobs} onClose={()=>setShowEmailModal(false)} month={m} year={y} showToast={showToast}/>}
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+/* ============ MONTH VIEW ============ */
+function MonthView({calDays,employees,schedule,setShift,y,m,empShiftCounts,selectedCell,setSelectedCell}){
+  const [editCell,setEditCell]=useState(null);
+  const weeks=[];
+  for(let i=0;i<calDays.length;i+=7) weeks.push(calDays.slice(i,i+7));
+
+  const handleCellClick=(dayObj,empId)=>{
+    if(!dayObj.cur) return;
+    setEditCell({...dayObj,empId});
+  };
+
+  const getDayShifts=(dayObj)=>{
+    if(!dayObj.cur) return {};
+    const key=getDateKey(dayObj.year,dayObj.month,dayObj.day);
+    return schedule[key]||{};
+  };
+
+  const isSunday=(dayObj)=>new Date(dayObj.year,dayObj.month,dayObj.day).getDay()===0;
+
+  return(
+    <div>
+      <div className="cal-grid">
+        {['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'].map((d,i)=>(
+          <div key={d} className={`cal-header-cell${i===6?' sunday':''}`}>{d}</div>
+        ))}
+        {weeks.map((week,wi)=>week.map((dayObj,di)=>{
+          const shifts=getDayShifts(dayObj);
+          const sun=isSunday(dayObj);
+          const isToday=dayObj.cur&&dayObj.day===new Date().getDate()&&dayObj.month===new Date().getMonth()&&dayObj.year===new Date().getFullYear();
+          return(
+            <div key={`${wi}-${di}`} className={`cal-day${!dayObj.cur?' other-month':''}${isToday?' today':''}${sun?' sunday-col':''}`}>
+              <div className="cal-day-num">{dayObj.day}</div>
+              {dayObj.cur&&employees.slice(0,4).map(e=>{
+                const sh=shifts[e.id]||'OFF';
+                if(sh==='OFF') return null;
+                return(
+                  <ShiftPill key={e.id} shift={sh} empName={e.name} onClick={()=>handleCellClick(dayObj,e.id)}/>
+                );
+              })}
+              {dayObj.cur&&Object.keys(shifts).length===0&&(
+                <div style={{fontSize:10,color:'#cbd5e1',marginTop:4,textAlign:'center',cursor:'pointer'}} onClick={()=>setEditCell({...dayObj,empId:null})}>
+                  + Thêm ca
+                </div>
+              )}
+              {dayObj.cur&&employees.length>4&&Object.values(shifts).filter(s=>s!=='OFF').length>4&&(
+                <div style={{fontSize:10,color:'#94a3b8',padding:'2px 4px'}}>+{employees.length-4} người</div>
+              )}
+            </div>
+          );
+        }))}
+      </div>
+      {editCell&&(
+        <ShiftEditModal
+          dayObj={editCell}
+          employees={employees}
+          schedule={schedule}
+          setShift={setShift}
+          onClose={()=>setEditCell(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============ WEEK VIEW ============ */
+function WeekView({weekDays,employees,schedule,setShift,empShiftCounts}){
+  const [editCell,setEditCell]=useState(null);
+  const getShift=(e,d)=>{
+    const key=getDateKey(d.year,d.month,d.day);
+    return schedule[key]?.[e.id]||'OFF';
+  };
+  const isSun=(d)=>new Date(d.year,d.month,d.day).getDay()===0;
+
+  return(
+    <div>
+      <div className="week-grid">
+        <div className="week-header" style={{background:'#134e4a'}}>Nhân viên</div>
+        {weekDays.map((d,i)=>(
+          <div key={i} className={`week-header${isSun(d)?' sunday':''}`} style={{background:isSun(d)?'#92400e':'#134e4a'}}>
+            <div style={{fontSize:10,marginBottom:2}}>{['CN','T2','T3','T4','T5','T6','T7'][new Date(d.year,d.month,d.day).getDay()]}</div>
+            <div style={{fontSize:14,fontWeight:700}}>{d.day}/{d.month+1}</div>
+          </div>
+        ))}
+        {employees.map(e=>(
+          <React.Fragment key={e.id}>
+            <div className="week-emp-cell">
+              <div className="week-emp-avatar" style={{background:e.color}}>{e.avatar}</div>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:'#0f172a'}}>{e.name.split(' ').slice(-2).join(' ')}</div>
+                <div style={{fontSize:10,color:'#94a3b8'}}>{empShiftCounts[e.id]?.total||0}/26 công</div>
+              </div>
+            </div>
+            {weekDays.map((d,di)=>{
+              const sh=getShift(e,d);
+              const s=SHIFTS[sh]||SHIFTS.OFF;
+              return(
+                <div key={di} className="week-shift-cell" style={{background:d.cur?'':' #f8fafc'}} onClick={()=>d.cur&&setEditCell({...d,empId:e.id})}>
+                  {sh!=='OFF'?(
+                    <div className="week-shift-badge" style={{background:s.bg,color:s.text}}>
+                      {sh}
+                    </div>
+                  ):(
+                    <div style={{color:'#e2e8f0',fontSize:18}}>—</div>
+                  )}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </div>
+      {editCell&&(
+        <ShiftEditModal dayObj={editCell} employees={employees} schedule={schedule} setShift={setShift} onClose={()=>setEditCell(null)}/>
+      )}
+    </div>
+  );
+}
+
+/* ============ SHIFT EDIT MODAL ============ */
+function ShiftEditModal({dayObj,employees,schedule,setShift,onClose}){
+  const key=getDateKey(dayObj.year,dayObj.month,dayObj.day);
+  const daySchedule=schedule[key]||{};
+
+  return(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-md" onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Chỉnh sửa ca làm – {dayObj.day}/{dayObj.month+1}/{dayObj.year} ({DAYS_FULL[new Date(dayObj.year,dayObj.month,dayObj.day).getDay()]})</h3>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={12}/></button>
+        </div>
+        <div className="modal-body">
+          <div style={{marginBottom:12,padding:'10px 14px',background:'#f0fdf4',borderRadius:8,fontSize:12,color:'#065f46'}}>
+            <strong>Quy tắc:</strong> CN: 1 C2 + 1 T + 1 O/NT | T2-T7: 1 C1 + 1 T + 1 O/NT + còn lại C2
+          </div>
+          {employees.map(e=>{
+            const cur=daySchedule[e.id]||'OFF';
+            return(
+              <div key={e.id} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,padding:'10px 12px',background:'#f8fafc',borderRadius:8}}>
+                <div style={{width:32,height:32,borderRadius:'50%',background:e.color,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:12}}>{e.avatar}</div>
+                <div style={{flex:1,fontSize:13,fontWeight:600,color:'#0f172a'}}>{e.name}</div>
+                <div style={{display:'flex',gap:4}}>
+                  {Object.keys(SHIFTS).map(sh=>{
+                    const s=SHIFTS[sh];
+                    return(
+                      <button key={sh} onClick={()=>setShift(e.id,dayObj.day,dayObj.month,dayObj.year,sh)}
+                        style={{padding:'4px 8px',borderRadius:6,border:`1.5px solid ${cur===sh?s.dot:'#e2e8f0'}`,background:cur===sh?s.bg:'#fff',color:cur===sh?s.text:'#64748b',fontSize:11,fontWeight:700,cursor:'pointer'}}>
+                        {sh}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-primary" onClick={onClose}><Icon name="check" size={14}/>Xong</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ SHIFT COUNT TABLE ============ */
+function ShiftCountTable({employees,empShiftCounts}){
+  return(
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Tổng hợp công theo nhân viên</span>
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table className="att-table">
+          <thead>
+            <tr>
+              <th>Nhân viên</th>
+              <th style={{textAlign:'center'}}>Ca 1 (C1)</th>
+              <th style={{textAlign:'center'}}>Ca Trưa (T)</th>
+              <th style={{textAlign:'center'}}>Ca Tối (O/NT)</th>
+              <th style={{textAlign:'center'}}>Ca 2 (C2)</th>
+              <th style={{textAlign:'center'}}>Tổng công</th>
+              <th style={{textAlign:'center'}}>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map(e=>{
+              const c=empShiftCounts[e.id]||{C1:0,T:0,'O/NT':0,C2:0,total:0};
+              const ok=c.total===26;
+              const pct=Math.min(100,Math.round(c.total/26*100));
+              return(
+                <tr key={e.id}>
+                  <td>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      <div style={{width:30,height:30,borderRadius:'50%',background:e.color,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:12}}>{e.avatar}</div>
+                      <div>
+                        <div style={{fontWeight:700,color:'#0f172a'}}>{e.name}</div>
+                        <div style={{fontSize:11,color:'#94a3b8'}}>{e.position}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{textAlign:'center'}}><span style={{fontWeight:600,color:'#1d4ed8'}}>{c.C1}</span></td>
+                  <td style={{textAlign:'center'}}><span style={{fontWeight:600,color:'#065f46'}}>{c.T}</span></td>
+                  <td style={{textAlign:'center'}}><span style={{fontWeight:600,color:'#5b21b6'}}>{c['O/NT']}</span></td>
+                  <td style={{textAlign:'center'}}><span style={{fontWeight:600,color:'#92400e'}}>{c.C2}</span></td>
+                  <td style={{textAlign:'center'}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15,color:ok?'#10b981':c.total>26?'#ef4444':'#f59e0b'}}>{c.total}/26</div>
+                      <div className="progress-bar" style={{width:80,margin:'4px auto 0'}}>
+                        <div className="progress-fill" style={{width:`${pct}%`,background:ok?'#10b981':c.total>26?'#ef4444':'#f59e0b'}}/>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{textAlign:'center'}}>
+                    <span className="status-badge" style={{background:ok?'#d1fae5':c.total>26?'#fee2e2':'#fef3c7',color:ok?'#065f46':c.total>26?'#991b1b':'#92400e'}}>
+                      {ok?'✓ Đủ công':c.total>26?'⚠ Vượt ca':'📋 Chưa đủ'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ============ EMAIL MODAL ============ */
+function EmailModal({employees,emailJobs,setEmailJobs,onClose,month,year,showToast}){
+  const [tab,setTab]=useState('send');
+  const [form,setForm]=useState({to:'all',empId:'',subject:`Lịch làm việc ${MONTHS[month]} ${year}`,body:'',scheduled:false,scheduledAt:''});
+
+  const handleSend=()=>{
+    const job={
+      id:Date.now(),
+      to:form.to==='all'?'Tất cả nhân viên':employees.find(e=>e.id===+form.empId)?.name||'',
+      subject:form.subject,
+      scheduledAt:form.scheduled?new Date(form.scheduledAt):new Date(),
+      status:form.scheduled?'scheduled':'sent',
+      sentAt:form.scheduled?null:new Date(),
+    };
+    setEmailJobs(prev=>[job,...prev]);
+    showToast(form.scheduled?'Đã đặt lịch gửi email!':'Email đã gửi thành công!','success');
+    onClose();
+  };
+
+  return(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Thông báo & Gửi lịch làm việc</h3>
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><Icon name="x" size={12}/></button>
+        </div>
+        <div style={{display:'flex',borderBottom:'1px solid #f1f5f9'}}>
+          {[{k:'send',label:'Gửi email'},{k:'history',label:'Lịch sử hẹn giờ'}].map(t=>(
+            <button key={t.k} onClick={()=>setTab(t.k)}
+              style={{padding:'10px 20px',border:'none',background:'none',fontWeight:600,fontSize:13,color:tab===t.k?'#0f766e':'#64748b',borderBottom:`2px solid ${tab===t.k?'#0f766e':'transparent'}`,cursor:'pointer'}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="modal-body">
+          {tab==='send'?(
+            <div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Gửi cho</label>
+                  <select className="form-control" value={form.to} onChange={e=>setForm(f=>({...f,to:e.target.value}))}>
+                    <option value="all">Tất cả nhân viên</option>
+                    <option value="individual">Từng người</option>
+                  </select>
+                </div>
+                {form.to==='individual'&&(
+                  <div className="form-group">
+                    <label className="form-label">Chọn nhân viên</label>
+                    <select className="form-control" value={form.empId} onChange={e=>setForm(f=>({...f,empId:e.target.value}))}>
+                      <option value="">-- Chọn --</option>
+                      {employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Tiêu đề email</label>
+                <input className="form-control" value={form.subject} onChange={e=>setForm(f=>({...f,subject:e.target.value}))}/>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Nội dung</label>
+                <textarea className="form-control" rows={5} value={form.body} onChange={e=>setForm(f=>({...f,body:e.target.value}))}
+                  placeholder="Nhập nội dung email... (để trống sẽ dùng nội dung lịch làm việc mặc định)"/>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 0',borderTop:'1px solid #f1f5f9',borderBottom:'1px solid #f1f5f9',marginBottom:12}}>
+                <input type="checkbox" id="sched" checked={form.scheduled} onChange={e=>setForm(f=>({...f,scheduled:e.target.checked}))} style={{width:16,height:16}}/>
+                <label htmlFor="sched" style={{fontSize:13,fontWeight:600,color:'#374151',cursor:'pointer'}}>Hẹn giờ gửi tự động</label>
+              </div>
+              {form.scheduled&&(
+                <div className="form-group">
+                  <label className="form-label">Thời gian gửi</label>
+                  <input type="datetime-local" className="form-control" value={form.scheduledAt} onChange={e=>setForm(f=>({...f,scheduledAt:e.target.value}))}/>
+                </div>
+              )}
+              <div style={{background:'#f0fdf4',padding:'12px 14px',borderRadius:8,fontSize:12,color:'#065f46',marginTop:8}}>
+                <strong>📎 Đính kèm:</strong> File ảnh lịch làm việc {MONTHS[month]} {year} (PNG 4K)
+              </div>
+            </div>
+          ):(
+            <div>
+              <div style={{marginBottom:12,fontSize:13,color:'#64748b',fontWeight:500}}>
+                Tổng {emailJobs.length} email đã lên lịch hoặc đã gửi
+              </div>
+              {emailJobs.length===0&&(
+                <div style={{textAlign:'center',padding:40,color:'#94a3b8',fontSize:14}}>Chưa có lịch sử gửi email</div>
+              )}
+              {emailJobs.map(job=>(
+                <div key={job.id} className="email-schedule-item">
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:13,color:'#0f172a',marginBottom:3}}>{job.subject}</div>
+                    <div style={{fontSize:12,color:'#64748b'}}>Gửi cho: <strong>{job.to}</strong></div>
+                    <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>
+                      {job.status==='scheduled'?`⏰ Hẹn giờ: ${new Date(job.scheduledAt).toLocaleString('vi-VN')}`:`✅ Đã gửi: ${new Date(job.scheduledAt).toLocaleString('vi-VN')}`}
+                    </div>
+                  </div>
+                  <span className="status-badge" style={{background:job.status==='sent'?'#d1fae5':job.status==='scheduled'?'#fef3c7':'#fee2e2',color:job.status==='sent'?'#065f46':job.status==='scheduled'?'#92400e':'#991b1b'}}>
+                    {job.status==='sent'?'Đã gửi':job.status==='scheduled'?'Đã hẹn':'Lỗi'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {tab==='send'&&(
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={onClose}>Hủy</button>
+            <button className="btn btn-primary" onClick={handleSend}>
+              <Icon name="send" size={14}/>{form.scheduled?'Đặt lịch hẹn':'Gửi ngay'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============ ATTENDANCE MODULE ============ */
+function AttendanceModule({employees,schedule,showToast}){
+  const [selectedMonth,setSelectedMonth]=useState(new Date(2026,3,1));
+  const [editRow,setEditRow]=useState(null);
+  const [explanations,setExplanations]=useState({});
+  const y=selectedMonth.getFullYear(), m=selectedMonth.getMonth();
+
+  const getAttendance=(empId)=>{
+    const dim=getDaysInMonth(y,m);
+    let worked=0,absent=0,late=0;
+    for(let d=1;d<=dim;d++){
+      const key=getDateKey(y,m,d);
+      const sh=schedule[key]?.[empId];
+      if(sh&&sh!=='OFF') worked++;
+    }
+    return{worked,absent:Math.max(0,26-worked),late:0,overtime:0};
+  };
+
+  return(
+    <div className="page">
+      <div className="stats-grid">
+        <div className="stat-card"><div className="stat-label">Tổng ngày công</div><div className="stat-value" style={{color:'#0f766e'}}>{getDaysInMonth(y,m)}</div><div className="stat-sub">ngày trong tháng</div></div>
+        <div className="stat-card"><div className="stat-label">Nhân viên đủ công</div><div className="stat-value" style={{color:'#3b82f6'}}>{employees.filter(e=>getAttendance(e.id).worked>=26).length}</div><div className="stat-sub">/ {employees.length} người</div></div>
+        <div className="stat-card"><div className="stat-label">Giải trình chờ</div><div className="stat-value" style={{color:'#f59e0b'}}>{Object.values(explanations).filter(e=>e.status==='pending').length}</div><div className="stat-sub">trường hợp</div></div>
+        <div className="stat-card"><div className="stat-label">Đã duyệt</div><div className="stat-value" style={{color:'#10b981'}}>{Object.values(explanations).filter(e=>e.status==='approved').length}</div><div className="stat-sub">giải trình</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Bảng chấm công – {MONTHS[m]} {y}</span>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <button className="cal-nav-btn" onClick={()=>setSelectedMonth(new Date(y,m-1,1))}><Icon name="chevLeft" size={14}/></button>
+            <span style={{fontSize:13,fontWeight:700,color:'#0f172a'}}>{MONTHS[m]} {y}</span>
+            <button className="cal-nav-btn" onClick={()=>setSelectedMonth(new Date(y,m+1,1))}><Icon name="chevRight" size={14}/></button>
+            <button className="btn btn-accent btn-sm"><Icon name="download" size={12}/>Xuất Excel</button>
+          </div>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table className="att-table">
+            <thead>
+              <tr>
+                <th>Nhân viên</th>
+                <th style={{textAlign:'center'}}>Số công</th>
+                <th style={{textAlign:'center'}}>Vắng</th>
+                <th style={{textAlign:'center'}}>Tiến độ</th>
+                <th style={{textAlign:'center'}}>Giải trình</th>
+                <th style={{textAlign:'center'}}>Trạng thái</th>
+                <th style={{textAlign:'center'}}>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map(e=>{
+                const att=getAttendance(e.id);
+                const exp=explanations[e.id];
+                const pct=Math.min(100,Math.round(att.worked/26*100));
+                const ok=att.worked>=26;
+                return(
+                  <tr key={e.id}>
+                    <td>
+                      <div style={{display:'flex',alignItems:'center',gap:10}}>
+                        <div style={{width:32,height:32,borderRadius:'50%',background:e.color,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:12}}>{e.avatar}</div>
+                        <div>
+                          <div style={{fontWeight:700,color:'#0f172a'}}>{e.name}</div>
+                          <div style={{fontSize:11,color:'#94a3b8'}}>{e.dept}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{textAlign:'center',fontWeight:700,fontSize:16,color:ok?'#10b981':'#f59e0b'}}>{att.worked}</td>
+                    <td style={{textAlign:'center',color:'#ef4444',fontWeight:600}}>{att.absent}</td>
+                    <td style={{textAlign:'center'}}>
+                      <div style={{width:100,margin:'0 auto'}}>
+                        <div style={{fontSize:11,color:'#64748b',marginBottom:3}}>{pct}%</div>
+                        <div className="progress-bar"><div className="progress-fill" style={{width:`${pct}%`,background:ok?'#10b981':'#f59e0b'}}/></div>
+                      </div>
+                    </td>
+                    <td style={{textAlign:'center'}}>
+                      {exp?(
+                        <span className="status-badge" style={{background:exp.status==='approved'?'#d1fae5':'#fef3c7',color:exp.status==='approved'?'#065f46':'#92400e'}}>
+                          {exp.status==='approved'?'✓ Đã duyệt':'⏳ Chờ duyệt'}
+                        </span>
+                      ):att.absent>0?(
+                        <button className="btn btn-secondary btn-sm" onClick={()=>setEditRow(e)}>Thêm giải trình</button>
+                      ):(<span style={{color:'#94a3b8',fontSize:12}}>—</span>)}
+                    </td>
+                    <td style={{textAlign:'center'}}>
+                      <span className="status-badge" style={{background:ok?'#d1fae5':'#fee2e2',color:ok?'#065f46':'#991b1b'}}>
+                        {ok?'✓ Đủ công':'✗ Thiếu công'}
+                      </span>
+                    </td>
+                    <td style={{textAlign:'center'}}>
+                      <button className="btn btn-secondary btn-sm"><Icon name="chart" size={12}/>Chi tiết</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {editRow&&(
+        <div className="modal-overlay" onClick={()=>setEditRow(null)}>
+          <div className="modal modal-md" onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Giải trình công – {editRow.name}</h3>
+              <button className="btn btn-secondary btn-sm" onClick={()=>setEditRow(null)}><Icon name="x" size={12}/></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group"><label className="form-label">Lý do vắng mặt</label>
+                <select className="form-control">
+                  <option>Nghỉ phép</option><option>Bệnh có giấy tờ</option><option>Việc gia đình</option><option>Lý do khác</option>
+                </select>
+              </div>
+              <div className="form-group"><label className="form-label">Ngày vắng</label>
+                <input type="date" className="form-control"/>
+              </div>
+              <div className="form-group"><label className="form-label">Mô tả chi tiết</label>
+                <textarea className="form-control" rows={4} placeholder="Nhập lý do chi tiết..."/>
+              </div>
+              <div className="form-group"><label className="form-label">Tài liệu đính kèm</label>
+                <input type="file" className="form-control"/>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setEditRow(null)}>Hủy</button>
+              <button className="btn btn-primary" onClick={()=>{
+                setExplanations(prev=>({...prev,[editRow.id]:{status:'pending',reason:'Nghỉ phép'}}));
+                setEditRow(null);
+                showToast('Đã gửi giải trình','success');
+              }}><Icon name="send" size={14}/>Gửi giải trình</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============ SHIFT CONFIG MODULE ============ */
+function ShiftConfigModule({shiftConfig,setShiftConfig,showToast}){
+  const [editShift,setEditShift]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({id:'',name:'',start:'',end:'',color:'#3b82f6',minStaff:1,maxStaff:5});
+
+  const handleSave=()=>{
+    if(editShift){
+      setShiftConfig(prev=>prev.map(s=>s.id===editShift.id?{...form,id:editShift.id}:s));
+      showToast('Đã cập nhật ca làm việc','success');
+    }else{
+      setShiftConfig(prev=>[...prev,{...form,id:form.name.replace(/\s/g,'').toUpperCase().slice(0,4)}]);
+      showToast('Đã thêm ca làm việc','success');
+    }
+    setEditShift(null);setShowAdd(false);
+    setForm({id:'',name:'',start:'',end:'',color:'#3b82f6',minStaff:1,maxStaff:5});
+  };
+
+  return(
+    <div className="page">
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Cấu hình ca làm việc</span>
+          <button className="btn btn-primary btn-sm" onClick={()=>{setShowAdd(true);setEditShift(null);setForm({id:'',name:'',start:'',end:'',color:'#3b82f6',minStaff:1,maxStaff:5})}}>
+            <Icon name="plus" size={12}/>Thêm ca
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{marginBottom:16,padding:'12px 14px',background:'#f0fdf4',borderRadius:10,border:'1px solid #a7f3d0'}}>
+            <div style={{fontWeight:700,fontSize:13,color:'#065f46',marginBottom:6}}>Quy tắc xếp ca mặc định</div>
+            <div style={{fontSize:12,color:'#374151',lineHeight:1.8}}>
+              • <strong>Thứ 2 – Thứ 7:</strong> 1 người C1 (Sáng) + 1 người T (Trưa) + 1 người O/NT (Tối/Đêm) + còn lại C2 (Chiều)<br/>
+              • <strong>Chủ nhật:</strong> 1 người C2 + 1 người T + 1 người O/NT (chỉ 3 người)<br/>
+              • <strong>Mục tiêu:</strong> Mỗi nhân viên đủ <strong>26 công/tháng</strong>
+            </div>
+          </div>
+          {shiftConfig.map(s=>(
+            <div key={s.id} className="shift-config-card">
+              <div style={{width:16,height:16,borderRadius:'50%',background:s.color,flexShrink:0}}/>
+              <div className="shift-info">
+                <div className="shift-info-name">{s.name} <span style={{fontSize:11,fontWeight:500,color:'#94a3b8',marginLeft:6}}>[{s.id}]</span></div>
+                <div className="shift-info-time">⏰ {s.start} – {s.end} | Tối thiểu {s.minStaff} người – Tối đa {s.maxStaff} người</div>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-secondary btn-sm" onClick={()=>{setEditShift(s);setForm({...s});setShowAdd(true)}}><Icon name="edit" size={12}/>Sửa</button>
+                <button className="btn btn-secondary btn-sm" style={{color:'#ef4444'}} onClick={()=>{setShiftConfig(prev=>prev.filter(x=>x.id!==s.id));showToast('Đã xóa ca','success')}}><Icon name="trash" size={12}/></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {showAdd&&(
+        <div className="modal-overlay" onClick={()=>setShowAdd(false)}>
+          <div className="modal modal-md" onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editShift?'Chỉnh sửa ca':'Thêm ca làm việc mới'}</h3>
+              <button className="btn btn-secondary btn-sm" onClick={()=>setShowAdd(false)}><Icon name="x" size={12}/></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group"><label className="form-label">Tên ca</label><input className="form-control" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="vd: Ca Sáng"/></div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Giờ bắt đầu</label><input type="time" className="form-control" value={form.start} onChange={e=>setForm(f=>({...f,start:e.target.value}))}/></div>
+                <div className="form-group"><label className="form-label">Giờ kết thúc</label><input type="time" className="form-control" value={form.end} onChange={e=>setForm(f=>({...f,end:e.target.value}))}/></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Nhân sự tối thiểu</label><input type="number" className="form-control" min={1} value={form.minStaff} onChange={e=>setForm(f=>({...f,minStaff:+e.target.value}))}/></div>
+                <div className="form-group"><label className="form-label">Nhân sự tối đa</label><input type="number" className="form-control" min={1} value={form.maxStaff} onChange={e=>setForm(f=>({...f,maxStaff:+e.target.value}))}/></div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Màu sắc</label>
+                <div className="color-swatches">
+                  {COLORS.map(c=><div key={c} className={`color-swatch${form.color===c?' active':''}`} style={{background:c}} onClick={()=>setForm(f=>({...f,color:c}))}/>)}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowAdd(false)}>Hủy</button>
+              <button className="btn btn-primary" onClick={handleSave}><Icon name="check" size={14}/>Lưu</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============ EMPLOYEE MODULE ============ */
+function EmployeeModule({employees,setEmployees,schedule,showToast}){
+  const [showAdd,setShowAdd]=useState(false);
+  const [editEmp,setEditEmp]=useState(null);
+  const [form,setForm]=useState({name:'',email:'',phone:'',position:'Nhân viên',dept:'',color:'#3b82f6'});
+  const [search,setSearch]=useState('');
+
+  const filtered=employees.filter(e=>e.name.toLowerCase().includes(search.toLowerCase())||e.dept.toLowerCase().includes(search.toLowerCase()));
+
+  const handleSave=()=>{
+    const avatar=form.name.split(' ').pop()[0].toUpperCase();
+    if(editEmp){
+      setEmployees(prev=>prev.map(e=>e.id===editEmp.id?{...e,...form,avatar}:e));
+      showToast('Đã cập nhật nhân viên','success');
+    }else{
+      setEmployees(prev=>[...prev,{...form,id:Date.now(),avatar}]);
+      showToast('Đã thêm nhân viên mới','success');
+    }
+    setShowAdd(false);setEditEmp(null);
+    setForm({name:'',email:'',phone:'',position:'Nhân viên',dept:'',color:'#3b82f6'});
+  };
+
+  const handleDelete=(id)=>{
+    setEmployees(prev=>prev.filter(e=>e.id!==id));
+    showToast('Đã xóa nhân viên','success');
+  };
+
+  const getMonthShifts=(empId)=>{
+    const y=2026,m=3;
+    const dim=getDaysInMonth(y,m);
+    let count=0;
+    for(let d=1;d<=dim;d++){
+      const key=getDateKey(y,m,d);
+      if(schedule[key]?.[empId]&&schedule[key][empId]!=='OFF') count++;
+    }
+    return count;
+  };
+
+  return(
+    <div className="page">
+      <div className="stats-grid">
+        <div className="stat-card"><div className="stat-label">Tổng nhân viên</div><div className="stat-value" style={{color:'#0f766e'}}>{employees.length}</div></div>
+        <div className="stat-card"><div className="stat-label">Bộ phận A</div><div className="stat-value" style={{color:'#3b82f6'}}>{employees.filter(e=>e.dept.includes('A')).length}</div></div>
+        <div className="stat-card"><div className="stat-label">Bộ phận B</div><div className="stat-value" style={{color:'#8b5cf6'}}>{employees.filter(e=>e.dept.includes('B')).length}</div></div>
+        <div className="stat-card"><div className="stat-label">Bộ phận C</div><div className="stat-value" style={{color:'#f59e0b'}}>{employees.filter(e=>e.dept.includes('C')).length}</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Danh sách nhân viên ({filtered.length})</span>
+          <div style={{display:'flex',gap:8}}>
+            <input className="form-control" style={{width:220}} placeholder="Tìm kiếm..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            <button className="btn btn-primary btn-sm" onClick={()=>{setShowAdd(true);setEditEmp(null);setForm({name:'',email:'',phone:'',position:'Nhân viên',dept:'',color:'#3b82f6'})}}>
+              <Icon name="plus" size={12}/>Thêm nhân viên
+            </button>
+          </div>
+        </div>
+        <div className="card-body">
+          <div className="emp-grid">
+            {filtered.map(e=>(
+              <div key={e.id} className="emp-card">
+                <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+                  <div className="emp-avatar-lg" style={{background:e.color}}>{e.avatar}</div>
+                  <div style={{display:'flex',gap:4}}>
+                    <button className="btn btn-secondary btn-sm" onClick={()=>{setEditEmp(e);setForm({...e});setShowAdd(true)}}><Icon name="edit" size={11}/></button>
+                    <button className="btn btn-secondary btn-sm" style={{color:'#ef4444'}} onClick={()=>handleDelete(e.id)}><Icon name="trash" size={11}/></button>
+                  </div>
+                </div>
+                <div className="emp-name">{e.name}</div>
+                <div className="emp-role">{e.position} • {e.dept}</div>
+                <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>{e.email}</div>
+                <div style={{fontSize:11,color:'#94a3b8'}}>{e.phone}</div>
+                <div className="emp-stats">
+                  <div className="emp-stat"><div className="emp-stat-val">{getMonthShifts(e.id)}</div><div className="emp-stat-label">Công T4</div></div>
+                  <div className="emp-stat"><div className="emp-stat-val" style={{color:'#f59e0b'}}>{Math.max(0,26-getMonthShifts(e.id))}</div><div className="emp-stat-label">Còn thiếu</div></div>
+                  <div className="emp-stat"><div className="emp-stat-val" style={{color:'#8b5cf6'}}>26</div><div className="emp-stat-label">Mục tiêu</div></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {showAdd&&(
+        <div className="modal-overlay" onClick={()=>setShowAdd(false)}>
+          <div className="modal modal-md" onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editEmp?'Chỉnh sửa nhân viên':'Thêm nhân viên mới'}</h3>
+              <button className="btn btn-secondary btn-sm" onClick={()=>setShowAdd(false)}><Icon name="x" size={12}/></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group"><label className="form-label">Họ và tên *</label><input className="form-control" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Nguyễn Văn A"/></div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Email</label><input type="email" className="form-control" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="email@company.vn"/></div>
+                <div className="form-group"><label className="form-label">Số điện thoại</label><input className="form-control" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="0901 234 567"/></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label className="form-label">Chức vụ</label>
+                  <select className="form-control" value={form.position} onChange={e=>setForm(f=>({...f,position:e.target.value}))}>
+                    <option>Nhân viên</option><option>Tổ trưởng</option><option>Quản lý</option><option>Giám đốc</option>
+                  </select>
+                </div>
+                <div className="form-group"><label className="form-label">Bộ phận</label><input className="form-control" value={form.dept} onChange={e=>setForm(f=>({...f,dept:e.target.value}))} placeholder="Bộ phận A"/></div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Màu sắc nhận dạng</label>
+                <div className="color-swatches">
+                  {COLORS.map(c=><div key={c} className={`color-swatch${form.color===c?' active':''}`} style={{background:c}} onClick={()=>setForm(f=>({...f,color:c}))}/>)}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowAdd(false)}>Hủy</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={!form.name}><Icon name="check" size={14}/>Lưu</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============ SIDEBAR ============ */
+function Sidebar({active,setActive}){
+  const navItems=[
+    {id:'schedule',icon:'calendar',label:'Lịch làm việc',section:'Quản lý ca'},
+    {id:'attendance',icon:'chart',label:'Chấm công',section:'Quản lý ca'},
+    {id:'shifts',icon:'clock',label:'Cấu hình ca',section:'Cài đặt'},
+    {id:'employees',icon:'users',label:'Hệ thống nhân viên',section:'Cài đặt'},
+  ];
+  const sections=[...new Set(navItems.map(n=>n.section))];
+  return(
+    <div className="sidebar">
+      <div className="sidebar-logo">
+        <img src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo" onError={e=>e.target.style.display='none'}/>
+        <h1>WorkSchedule Pro</h1>
+        <p>Hệ thống quản lý ca làm việc</p>
+      </div>
+      {sections.map(sec=>(
+        <div key={sec} className="nav-section">
+          <div className="nav-label">{sec}</div>
+          {navItems.filter(n=>n.section===sec).map(n=>(
+            <button key={n.id} className={`nav-item${active===n.id?' active':''}`} onClick={()=>setActive(n.id)}>
+              <Icon name={n.icon} size={16}/>{n.label}
+            </button>
+          ))}
+        </div>
+      ))}
+      <div style={{marginTop:'auto',padding:'12px 16px',borderTop:'1px solid rgba(255,255,255,0.1)'}}>
+        <div style={{fontSize:11,color:'#5eead4',textAlign:'center'}}>v1.0.0 • WorkSchedule Pro</div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ MAIN APP ============ */
+function App(){
+  const [activeModule,setActiveModule]=useState('schedule');
+  const [employees,setEmployees]=useState(DEFAULT_EMPLOYEES);
+  const [schedule,setSchedule]=useState({});
+  const [shiftConfig,setShiftConfig]=useState(DEFAULT_SHIFT_CONFIG);
+  const [toast,setToast]=useState(null);
+
+  const showToast=(msg,type='success')=>{
+    setToast({msg,type});
+    setTimeout(()=>setToast(null),3500);
+  };
+
+  const moduleProps={employees,setEmployees,schedule,setSchedule,shiftConfig,setShiftConfig,showToast};
+  const titles={schedule:'Lịch làm việc',attendance:'Chấm công & Giải trình',shifts:'Cấu hình ca làm việc',employees:'Hệ thống nhân viên'};
+
+  return(
+    <div className="app-layout">
+      <Sidebar active={activeModule} setActive={setActiveModule}/>
+      <div className="main-content">
+        <div className="top-bar">
+          <h2>{titles[activeModule]}</h2>
+          <div className="top-bar-actions">
+            <div style={{fontSize:12,color:'#64748b'}}>
+              {new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+            </div>
+            <div style={{width:32,height:32,borderRadius:'50%',background:'#0f766e',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:12}}>A</div>
+          </div>
+        </div>
+        {activeModule==='schedule'&&<ScheduleModule {...moduleProps}/>}
+        {activeModule==='attendance'&&<AttendanceModule {...moduleProps}/>}
+        {activeModule==='shifts'&&<ShiftConfigModule {...moduleProps}/>}
+        {activeModule==='employees'&&<EmployeeModule {...moduleProps}/>}
+      </div>
+      {toast&&<Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
