@@ -1,1731 +1,1785 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Search, Plus, ShoppingCart, Trash2, Printer, 
-  CheckCircle, Clock, FileText, LogOut, 
-  History, AlertCircle, ScanBarcode, Download, Camera, Eye, AlertTriangle,
-  Settings, Database, Users, Lock, UserPlus, ShieldCheck, UserCircle, X, Image as ImageIcon,
-  RotateCcw, Send, Mail, Smartphone, QrCode, Pencil, PenTool, Check
-} from 'lucide-react';
-
-// --- MOCK DATA ---
-const MOCK_MEDICINES = [
-  { id: 'M001', name: 'Paracetamol', activeIngredient: 'Paracetamol 500mg', unit: 'Viên', stock: 5000, type: 'THUOC', category: 'BH' },
-  { id: 'M002', name: 'Natri Clorid 0.9%', activeIngredient: 'Natri Clorid 0.9% 500ml', unit: 'Chai', stock: 1200, type: 'THUOC', category: 'BH' },
-  { id: 'M003', name: 'Bơm tiêm 5ml', activeIngredient: '', unit: 'Cái', stock: 10000, type: 'VTYT', category: 'DV' },
-  { id: 'M004', name: 'Gạc vô khuẩn 10x10', activeIngredient: '', unit: 'Gói', stock: 3000, type: 'VTYT', category: 'BH' },
-  { id: 'M005', name: 'Adrenalin', activeIngredient: 'Adrenalin 1mg/1ml', unit: 'Ống', stock: 500, type: 'THUOC', category: 'BH' },
-  { id: 'M006', name: 'Dây truyền dịch', activeIngredient: '', unit: 'Sợi', stock: 2500, type: 'VTYT', category: 'DV' },
-  { id: 'M007', name: 'Găng tay y tế', activeIngredient: 'Size M', unit: 'Hộp', stock: 150, type: 'VTYT', category: 'DV' },
-  { id: 'M008', name: 'Cefotaxim', activeIngredient: 'Cefotaxim 1g', unit: 'Lọ', stock: 800, type: 'THUOC', category: 'BH' },
-];
-
-const DEPARTMENTS = [
-  { id: 'D01', name: 'Khoa Dược', role: 'DUOC' },
-  { id: 'K01', name: 'Khoa Cấp cứu', role: 'KHOA' },
-  { id: 'K02', name: 'Khoa Hồi sức tích cực', role: 'KHOA' },
-  { id: 'K03', name: 'Khoa Ngoại Tổng hợp', role: 'KHOA' },
-  { id: 'K04', name: 'Khoa Nội Tổng hợp', role: 'KHOA' },
-];
-
-const INITIAL_USERS = [
-  { username: 'duoc', password: '123', name: 'Nguyễn Văn Dược', phone: '0981234567', email: 'duoc@bv.vn', departmentId: 'D01', permissions: ['ADMIN', 'APPROVE', 'BORROW'], signature: null, signatureStatus: 'NONE' },
-  { username: 'capcuu', password: '123', name: 'Trần Cấp Cứu', phone: '0912345678', email: 'capcuu@bv.vn', departmentId: 'K01', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
-  { username: 'hoisuc', password: '123', name: 'Lê Hồi Sức', phone: '0901112233', email: 'hoisuc@bv.vn', departmentId: 'K02', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
-  { username: 'ngoai', password: '123', name: 'Phạm Ngoại Khoa', phone: '0933445566', email: 'ngoai@bv.vn', departmentId: 'K03', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
-  { username: 'noi', password: '123', name: 'Hoàng Nội Khoa', phone: '0977889900', email: 'noi@bv.vn', departmentId: 'K04', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
-];
-
-const INITIAL_RECORDS = [];
-
-// --- HELPER COMPONENTS ---
-const getBadgeStyle = (category) => {
-  return category === 'BH' 
-    ? 'bg-blue-500 text-white border-blue-600 shadow-sm' 
-    : 'bg-pink-500 text-white border-pink-600 shadow-sm';
-};
-
-function ConfirmDialog({ message, onConfirm, onCancel }) {
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
-        <div className="p-6">
-          <div className="flex items-center gap-3 text-amber-600 mb-4">
-            <AlertTriangle size={24} />
-            <h3 className="font-bold text-lg text-slate-800">Xác nhận thao tác</h3>
-          </div>
-          <p className="text-slate-700 font-medium">{message}</p>
-        </div>
-        <div className="p-4 bg-slate-50 border-t flex justify-end gap-3">
-          <button onClick={onCancel} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium transition-colors">Hủy</button>
-          <button onClick={onConfirm} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-colors shadow-sm">Đồng ý</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- IMAGE VIEWER MODAL (LIGHTBOX) ---
-function ImageViewerModal({ images, onClose }) {
-  return (
-    <div className="fixed inset-0 bg-black/95 z-[110] flex flex-col items-center justify-center p-4">
-      <div className="absolute top-4 right-4 flex gap-4">
-         <button onClick={onClose} className="text-white bg-slate-800 p-2 rounded-full hover:bg-slate-700 transition-colors shadow-lg"><X size={24}/></button>
-      </div>
-      <div className="flex gap-4 overflow-x-auto w-full max-w-6xl snap-x py-4 hide-scrollbar">
-        {images.map((img, i) => (
-          <img key={i} src={img} alt="Evidence" className="h-[80vh] w-auto max-w-full object-contain snap-center border border-slate-700 mx-auto" />
-        ))}
-      </div>
-      {images.length > 1 && <p className="text-slate-400 mt-2 text-sm italic animate-pulse">Cuộn ngang để xem các ảnh khác</p>}
-    </div>
-  );
-}
-
-// --- SIGNATURE PAD COMPONENT ---
-function SignaturePad({ onSave, onClose }) {
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#0f172a'; // dark slate
-  }, []);
-
-  const getCoordinates = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    if (e.touches && e.touches.length > 0) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top
-      };
-    }
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-  };
-
-  const startDrawing = (e) => {
-    e.preventDefault();
-    const { x, y } = getCoordinates(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-  };
-
-  const draw = (e) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const { x, y } = getCoordinates(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    if (!isDrawing) return;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.closePath();
-    setIsDrawing(false);
-  };
-
-  const clear = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  const save = () => {
-    const dataUrl = canvasRef.current.toDataURL('image/png');
-    onSave(dataUrl);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
-        <div className="p-4 bg-blue-700 text-white flex justify-between items-center">
-          <h3 className="font-bold flex items-center gap-2"><PenTool size={18} /> Vẽ chữ ký số</h3>
-          <button onClick={onClose} className="hover:bg-blue-600 p-1 rounded"><X size={20}/></button>
-        </div>
-        <div className="p-4 bg-slate-100">
-          <div className="bg-white border-2 border-dashed border-slate-300 rounded-lg h-64 relative touch-none">
-            <canvas
-              ref={canvasRef}
-              className="w-full h-full cursor-crosshair"
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseOut={stopDrawing}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={stopDrawing}
-            />
-            <div className="absolute bottom-2 right-2 text-xs text-slate-400 pointer-events-none">Ký vào khung này</div>
-          </div>
-        </div>
-        <div className="p-4 border-t flex justify-between items-center bg-slate-50">
-          <button onClick={clear} className="text-slate-500 hover:text-red-500 font-medium text-sm transition-colors">Xóa ký lại</button>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium transition-colors">Hủy</button>
-            <button onClick={save} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-colors">Lưu chữ ký</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- QR CAMERA SCANNER COMPONENT ---
-function QRCameraScanner({ onScan, onClose }) {
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!window.Html5QrcodeScanner) {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/html5-qrcode';
-      script.async = true;
-      script.onload = () => setScriptLoaded(true);
-      document.body.appendChild(script);
-    } else {
-      setScriptLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (scriptLoaded) {
-      const scanner = new window.Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-      scanner.render((text) => {
-        scanner.clear();
-        onScan(text);
-      }, (err) => { /* ignore */ });
-
-      return () => {
-        scanner.clear().catch(e => console.error(e));
-      };
-    }
-  }, [scriptLoaded, onScan]);
-
-  return (
-    <div className="fixed inset-0 bg-black/90 z-[80] flex flex-col items-center justify-center p-4">
-      <div className="w-[95vw] max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl relative">
-        <div className="flex justify-between items-center p-4 bg-blue-700 text-white">
-          <h3 className="font-bold flex items-center gap-2"><QrCode size={18} /> Quét QR Phiếu</h3>
-          <button onClick={onClose} className="p-1 hover:bg-blue-600 rounded"><X size={20}/></button>
-        </div>
-        <div className="p-4 bg-slate-100">
-          {!scriptLoaded ? (
-            <div className="text-center p-8 text-slate-500">Đang tải Camera...</div>
-          ) : (
-            <div id="qr-reader" className="w-full"></div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- STANDARD CAMERA COMPONENT ---
-function CameraCapture({ onCapture, onClose }) {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [stream, setStream] = useState(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(mediaStream => {
-        setStream(mediaStream);
-        if (videoRef.current) videoRef.current.srcObject = mediaStream;
-      })
-      .catch(err => {
-        setError('Không thể truy cập Camera. Vui lòng cấp quyền.');
-      });
-
-    return () => {
-      if (stream) stream.getTracks().forEach(track => track.stop());
-    };
-  }, []); 
-
-  const handleTakePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext('2d');
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    onCapture(imageData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col items-center justify-center p-4">
-      <div className="w-[95vw] max-w-lg bg-slate-900 rounded-2xl overflow-hidden shadow-2xl relative border border-slate-700">
-        <div className="flex justify-between items-center p-4 bg-slate-800 text-white">
-          <h3 className="font-bold flex items-center gap-2"><Camera size={18} /> Chụp ảnh minh chứng</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded"><X size={20}/></button>
-        </div>
-        <div className="relative bg-black aspect-video flex items-center justify-center">
-          {error ? (
-            <div className="text-red-400 p-4 text-center text-sm">{error}</div>
-          ) : (
-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-          )}
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
-        <div className="p-4 bg-slate-800 flex justify-center">
-          <button onClick={handleTakePhoto} disabled={!!error} className="h-16 w-16 bg-white rounded-full border-4 border-slate-400 hover:scale-105 transition-transform disabled:opacity-50 shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- MAIN APP COMPONENT ---
-export default function App() {
-  const [usersData, setUsersData] = useState(() => {
-    const saved = localStorage.getItem('qlmt_usersData');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
-  });
-  
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('qlmt_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [activeTab, setActiveTab] = useState('BORROW'); 
-  const [medicines] = useState(MOCK_MEDICINES);
-  const [cart, setCart] = useState([]);
-  
-  const [records, setRecords] = useState(() => {
-    const saved = localStorage.getItem('qlmt_records');
-    return saved ? JSON.parse(saved) : INITIAL_RECORDS;
-  });
-  
-  const [logs, setLogs] = useState([]);
-  const [toast, setToast] = useState(null);
-  const toastTimeoutRef = useRef(null);
-  
-  const [viewRecordId, setViewRecordId] = useState(null);
-  const [initialPrintId, setInitialPrintId] = useState(null);
-  const [hasWarnedLogin, setHasWarnedLogin] = useState(false);
-  const [confirmGlobalAction, setConfirmGlobalAction] = useState(null); 
-
-  useEffect(() => {
-    localStorage.setItem('qlmt_records', JSON.stringify(records));
-  }, [records]);
-
-  useEffect(() => {
-    localStorage.setItem('qlmt_usersData', JSON.stringify(usersData));
-  }, [usersData]);
-
-  const showToast = useCallback((message, type = 'success', duration = 3000) => {
-    setToast({ message, type });
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => setToast(null), duration);
-  }, []);
-
-  const addLog = useCallback((action, details, recordId = null) => {
-    const newLog = {
-      id: Date.now().toString(),
-      time: new Date(),
-      user: user.name,
-      department: user.departmentName,
-      action,
-      details,
-      recordId
-    };
-    setLogs(prev => [newLog, ...prev]);
-  }, [user]);
-
-  const handleLoginSuccess = (userData) => {
-    const freshUserData = usersData.find(u => u.username === userData.username);
-    const fullUser = { ...userData, ...freshUserData };
-    setUser(fullUser);
-    localStorage.setItem('qlmt_user', JSON.stringify(fullUser));
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setCart([]);
-    setActiveTab('BORROW');
-    setHasWarnedLogin(false); 
-    localStorage.removeItem('qlmt_user');
-  };
-
-  const handleViewRecordFromLogs = (id) => {
-    setActiveTab('LEDGER');
-    setViewRecordId(id);
-  };
-
-  const handleResetData = () => {
-    setConfirmGlobalAction({
-      message: 'Bạn có chắc chắn muốn xóa toàn bộ phiếu mượn và lịch sử hiện tại để làm lại từ đầu?',
-      action: () => {
-        setRecords([]);
-        setLogs([]);
-        setCart([]);
-        localStorage.removeItem('qlmt_records');
-        showToast('Đã khởi tạo lại dữ liệu test ban đầu!');
-        setConfirmGlobalAction(null);
-      }
-    });
-  };
-
-  const updateUserSession = (updatedUserInfo) => {
-    const updated = { ...user, ...updatedUserInfo };
-    setUser(updated);
-    localStorage.setItem('qlmt_user', JSON.stringify(updated));
-  };
-
-  useEffect(() => {
-    if (user && !hasWarnedLogin && records.length > 0) {
-      const isDược = user.role === 'DUOC' || user.permissions?.includes('APPROVE');
-      
-      const overdueRecords = records.filter(r => {
-        if (r.status === 'COMPLETED' || r.status === 'CANCELED' || r.status === 'PENDING') return false;
-        if (!isDược && r.department !== user.departmentName) return false;
-        const daysOverdue = Math.floor((Date.now() - new Date(r.createdAt)) / (1000 * 60 * 60 * 24));
-        return daysOverdue > 2; 
-      });
-
-      if (overdueRecords.length > 0) {
-        const grouped = overdueRecords.reduce((acc, r) => {
-           const days = Math.floor((Date.now() - new Date(r.createdAt)) / 86400000);
-           if(!acc[r.department]) acc[r.department] = [];
-           acc[r.department].push(days);
-           return acc;
-        }, {});
-        
-        let msg = '⚠ DANH SÁCH PHIẾU QUÁ HẠN:\n';
-        for(const [dept, daysArr] of Object.entries(grouped)) {
-           msg += `- ${dept}: ${daysArr.length} phiếu (quá hạn ${Math.max(...daysArr)} ngày)\n`;
-        }
-        showToast(msg, 'error', 7000);
-      }
-      setHasWarnedLogin(true);
-    }
-  }, [user, hasWarnedLogin, records, showToast]);
-
-  if (!user) {
-    return <LoginScreen onLogin={handleLoginSuccess} usersData={usersData} />;
-  }
-
-  const isDược = user.role === 'DUOC' || user.permissions?.includes('APPROVE');
-  const hasBorrowPerm = user.permissions?.includes('BORROW');
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {toast && (
-        <div className={`fixed top-4 right-4 z-[99] px-4 py-3 rounded shadow-lg flex items-start gap-2 text-white transition-all w-[90vw] max-w-sm sm:w-auto ${toast.type === 'error' ? 'bg-red-600 animate-bounce shadow-red-500/50' : 'bg-emerald-500'}`}>
-          {toast.type === 'error' ? <AlertCircle size={20} className="mt-0.5 shrink-0" /> : <CheckCircle size={20} className="mt-0.5 shrink-0" />}
-          <span className="font-medium whitespace-pre-line leading-relaxed text-sm">{toast.message}</span>
-        </div>
-      )}
-
-      <header className="bg-blue-700 text-white shadow-md z-10 relative">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo" className="h-10 w-10 bg-white rounded-full p-1" />
-            <div>
-              <h1 className="font-bold text-lg leading-tight">KHOA DƯỢC</h1>
-              <p className="text-xs text-blue-200">Hệ thống Quản lý Mượn Thuốc</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold">{user.name}</p>
-              <p className="text-xs text-blue-200">{user.departmentName}</p>
-            </div>
-            <button onClick={handleLogout} className="p-2 hover:bg-blue-600 rounded-full transition-colors" title="Đăng xuất">
-              <LogOut size={20} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="bg-white border-b sticky top-0 z-0 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto hide-scrollbar">
-          {hasBorrowPerm && (
-            <NavButton active={activeTab === 'BORROW'} onClick={() => setActiveTab('BORROW')} icon={<ShoppingCart size={18} />} label="Tạo phiếu mượn" />
-          )}
-          <NavButton active={activeTab === 'LEDGER'} onClick={() => setActiveTab('LEDGER')} icon={<FileText size={18} />} label="Sổ quản lý mượn" />
-          {isDược && (
-            <NavButton active={activeTab === 'LOGS'} onClick={() => setActiveTab('LOGS')} icon={<History size={18} />} label="Nhật ký hệ thống" />
-          )}
-          <NavButton active={activeTab === 'SETTINGS'} onClick={() => setActiveTab('SETTINGS')} icon={<Settings size={18} />} label="Cài đặt hệ thống" />
-        </div>
-      </div>
-
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6">
-        {activeTab === 'BORROW' && hasBorrowPerm && (
-          <BorrowManager 
-            user={user} 
-            departments={DEPARTMENTS}
-            medicines={medicines} 
-            cart={cart} 
-            setCart={setCart} 
-            onCheckout={(record, shouldPrint) => {
-              setRecords(prev => [record, ...prev]);
-              addLog('TẠO PHIẾU', `Tạo phiếu mượn mã ${record.id} (Chờ duyệt)`, record.id);
-              showToast('Đã tạo phiếu. Vui lòng chờ Khoa Dược duyệt!');
-              setActiveTab('LEDGER');
-              if (shouldPrint) {
-                setInitialPrintId(record.id);
-              }
-            }}
-          />
-        )}
-        {activeTab === 'LEDGER' && (
-          <LedgerManager 
-            user={user} 
-            usersData={usersData}
-            records={records} 
-            setRecords={setRecords}
-            addLog={addLog}
-            showToast={showToast}
-            externalOpenId={viewRecordId}
-            clearExternalOpenId={() => setViewRecordId(null)}
-            initialPrintId={initialPrintId}
-            clearInitialPrintId={() => setInitialPrintId(null)}
-          />
-        )}
-        {activeTab === 'LOGS' && isDược && <LogsViewer logs={logs} onViewRecord={handleViewRecordFromLogs} />}
-        {activeTab === 'SETTINGS' && (
-          <SettingsManager 
-            user={user}
-            updateUserSession={updateUserSession}
-            usersData={usersData}
-            setUsersData={setUsersData}
-            onResetData={handleResetData} 
-            showToast={showToast}
-          />
-        )}
-      </main>
-
-      {confirmGlobalAction && (
-        <ConfirmDialog 
-          message={confirmGlobalAction.message} 
-          onConfirm={confirmGlobalAction.action} 
-          onCancel={() => setConfirmGlobalAction(null)} 
-        />
-      )}
-
-      <style>{`
-        /* Chuẩn hóa font in ấn thành Times New Roman 100% */
-        @media print {
-          body * { visibility: hidden !important; }
-          #print-area, #print-area * { 
-            visibility: visible !important; 
-            font-family: "Times New Roman", Times, serif !important; 
-          }
-          #print-area { 
-            position: absolute; 
-            left: 0; top: 0; 
-            width: 100vw !important; 
-            min-height: 100vh !important;
-            padding: 0; margin: 0; 
-            background: white;
-          }
-          @page { size: auto; margin: 10mm; } 
-        }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-    </div>
-  );
-}
-
-// --- LOGIN COMPONENT ---
-function LoginScreen({ onLogin, usersData }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    setError('');
-    
-    const foundUser = usersData.find(u => u.username === username && u.password === password);
-    if (!foundUser) {
-      setError('Sai tài khoản hoặc mật khẩu!');
-      return;
-    }
-    const dept = DEPARTMENTS.find(d => d.id === foundUser.departmentId);
-    onLogin({
-      id: Date.now().toString(),
-      username: foundUser.username,
-      name: foundUser.name,
-      phone: foundUser.phone,
-      email: foundUser.email,
-      departmentId: dept.id,
-      departmentName: dept.name,
-      role: dept.role,
-      permissions: foundUser.permissions || [],
-      signature: foundUser.signature,
-      signatureStatus: foundUser.signatureStatus || 'NONE'
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-        <div className="text-center mb-8">
-          <img src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo" className="h-20 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-slate-800">Quản Lý Mượn Thuốc</h1>
-          <p className="text-slate-500 text-sm">Đăng nhập vào hệ thống</p>
-        </div>
-        {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center font-medium">{error}</div>}
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Tên đăng nhập</label>
-            <input required type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="VD: capcuu" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
-            <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="***" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-          </div>
-          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4">Vào hệ thống</button>
-        </form>
-        <div className="mt-4 text-xs text-slate-400 text-center">Tài khoản: duoc/123, capcuu/123, hoisuc/123...</div>
-      </div>
-    </div>
-  );
-}
-
-// --- BORROW MANAGER (KHOA LÂM SÀNG & DƯỢC TẠO PHIẾU) ---
-function BorrowManager({ user, departments, medicines, cart, setCart, onCheckout }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [borrowerName, setBorrowerName] = useState(user.name);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  
-  const isDược = user.role === 'DUOC' || user.permissions?.includes('APPROVE');
-  const [selectedDeptId, setSelectedDeptId] = useState(() => {
-    if (isDược) {
-      const firstKhoa = departments.find(d => d.role === 'KHOA');
-      return firstKhoa ? firstKhoa.id : user.departmentId;
-    }
-    return user.departmentId;
-  });
-
-  const isNameEdited = borrowerName.trim() !== user.name.trim();
-
-  const filteredMeds = searchTerm.trim().length >= 1 
-    ? medicines.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.id.toLowerCase().includes(searchTerm.toLowerCase()))
-    : medicines;
-
-  const addToCart = (med) => {
-    if (cart.find(item => item.id === med.id)) return; 
-    setCart([...cart, { ...med, borrowQty: 1 }]);
-  };
-
-  const updateCartQty = (id, qty) => {
-    const val = parseInt(qty);
-    if (isNaN(val) || val < 1) return;
-    setCart(cart.map(item => item.id === id ? { ...item, borrowQty: val } : item));
-  };
-
-  const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
-
-  const handleReviewCheckout = () => {
-    if (cart.length === 0 || !borrowerName.trim()) return;
-    setShowConfirmModal(true);
-  };
-
-  const confirmCheckout = (finalItems, shouldPrint) => {
-    const targetDept = departments.find(d => d.id === selectedDeptId) || { name: user.departmentName };
-    
-    // Gán chữ ký người mượn nếu chưa đổi tên và đã được duyệt chữ ký
-    const bSig = (!isNameEdited && user.signatureStatus === 'APPROVED') ? user.signature : null;
-
-    const newRecord = {
-      id: `PM${new Date().getTime().toString().slice(-6)}`,
-      department: targetDept.name,
-      borrowerName: borrowerName,
-      borrowerPhone: user.phone || '',
-      originalBorrowerName: user.username,
-      borrowerSignature: bSig,
-      isNameEdited: isNameEdited,
-      createdAt: new Date(),
-      items: finalItems.map(item => ({ ...item, returnedQty: 0 })),
-      status: 'PENDING', 
-      returnEvents: [], 
-      evidenceImages: [] 
-    };
-
-    onCheckout(newRecord, shouldPrint);
-    setCart([]);
-    setBorrowerName(user.name); 
-    setShowConfirmModal(false);
-  };
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-4">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Search size={20} /> Tìm kiếm Thuốc & VTYT</h2>
-        <div className="relative mb-4">
-          <input 
-            type="text" 
-            placeholder="Gõ tên thuốc, vật tư hoặc mã (từ 1 ký tự)..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-3 pl-10 border rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-          <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
-        </div>
-        
-        <div className={`overflow-x-auto border rounded-lg transition-all ${searchTerm.length === 0 ? 'max-h-[175px]' : 'max-h-[500px]'}`}>
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50 sticky top-0 shadow-sm z-10">
-              <tr>
-                <th className="p-3 font-semibold">Mã</th>
-                <th className="p-3 font-semibold">Tên Thuốc / VTYT</th>
-                <th className="p-3 font-semibold text-center">Nguồn</th>
-                <th className="p-3 font-semibold text-center">ĐVT</th>
-                <th className="p-3 font-semibold text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMeds.map(med => {
-                const inCart = cart.some(item => item.id === med.id);
-                return (
-                  <tr key={med.id} className="border-t hover:bg-slate-50 transition-colors">
-                    <td className="p-3 text-slate-500 font-mono text-xs">{med.id}</td>
-                    <td className="p-3">
-                      <span className="font-bold">{med.name}</span>
-                      {med.activeIngredient && <span className="ml-1 text-slate-600">({med.activeIngredient})</span>}
-                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border">{med.type === 'THUOC' ? 'Thuốc' : 'VTYT'}</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(med.category)}`}>{med.category}</span>
-                    </td>
-                    <td className="p-3 text-center">{med.unit}</td>
-                    <td className="p-3 text-right">
-                      <button 
-                        onClick={() => addToCart(med)}
-                        disabled={inCart}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 ml-auto transition-colors ${inCart ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
-                      >
-                        {inCart ? <CheckCircle size={16} /> : <Plus size={16} />}
-                        {inCart ? 'Đã chọn' : 'Chọn mượn'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredMeds.length === 0 && (
-                <tr><td colSpan="5" className="p-8 text-center text-slate-500">Không tìm thấy kết quả phù hợp.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {searchTerm.length === 0 && <div className="text-xs text-center text-slate-400 mt-2 italic">* Gõ từ khóa để tìm nhanh, hoặc cuộn danh sách trên.</div>}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col h-full">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-blue-700"><ShoppingCart size={20} /> Giỏ mượn</h2>
-        <div className="flex-1 overflow-y-auto mb-4 border rounded-lg bg-slate-50">
-          {cart.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 flex flex-col items-center">
-              <ShoppingCart size={40} className="mb-2 opacity-20" />
-              <p>Chưa chọn mặt hàng nào</p>
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {cart.map(item => (
-                <li key={item.id} className="p-3 bg-white">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm flex flex-wrap items-center gap-1">
-                      <span className="text-xs font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{item.id}</span>
-                      <span className="font-bold">{item.name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(item.category)}`}>{item.category}</span>
-                    </span>
-                    <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 p-1 shrink-0"><Trash2 size={16} /></button>
-                  </div>
-                  <div className="flex items-center justify-between text-sm mt-2">
-                    <span className="text-slate-500">SL mượn ({item.unit}):</span>
-                    <input type="number" min="1" value={item.borrowQty} onChange={(e) => updateCartQty(item.id, e.target.value)} className="w-20 p-1 border rounded text-right outline-none focus:border-blue-500 font-bold" />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="border-t pt-4 space-y-4">
-          {isDược && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tạo phiếu cho khoa <span className="text-red-500">*</span></label>
-              <select value={selectedDeptId} onChange={(e) => setSelectedDeptId(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none bg-white">
-                {departments.filter(d => d.role === 'KHOA').map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Người nhận thuốc (Mặc định là bạn)</label>
-            <input 
-              type="text" 
-              value={borrowerName}
-              onChange={(e) => setBorrowerName(e.target.value)}
-              className={`w-full p-2 border rounded-lg outline-none transition-colors ${isNameEdited ? 'border-red-300 text-red-600 bg-red-50 focus:border-red-500' : 'border-slate-300 focus:border-blue-500'}`}
-            />
-            {isNameEdited && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12} /> Tên thay đổi, chữ ký số tự động sẽ bị vô hiệu hóa.</p>}
-          </div>
-          
-          <button 
-            onClick={handleReviewCheckout}
-            disabled={cart.length === 0 || !borrowerName.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
-          >
-            <CheckCircle size={20} /> Xem lại & Gửi duyệt {cart.length > 0 && `(${cart.length})`}
-          </button>
-        </div>
-      </div>
-
-      {showConfirmModal && (
-        <ConfirmBorrowModal 
-          items={cart}
-          borrowerName={borrowerName}
-          departmentName={departments.find(d => d.id === selectedDeptId)?.name || user.departmentName}
-          onClose={() => setShowConfirmModal(false)}
-          onConfirm={confirmCheckout}
-        />
-      )}
-    </div>
-  );
-}
-
-function ConfirmBorrowModal({ items, borrowerName, departmentName, onClose, onConfirm }) {
-  const [editItems, setEditItems] = useState([...items]);
-
-  const handleQtyChange = (id, newQty) => {
-    let val = parseInt(newQty);
-    if (isNaN(val) || val < 1) val = 1;
-    setEditItems(editItems.map(item => item.id === id ? { ...item, borrowQty: val } : item));
-  };
-
-  const handleRemove = (id) => {
-    setEditItems(editItems.filter(item => item.id !== id));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-blue-700 text-white p-4 flex justify-between items-center">
-          <h3 className="font-bold text-lg flex items-center gap-2"><ShoppingCart size={20} /> Xác nhận phiếu mượn</h3>
-          <button onClick={onClose} className="text-blue-200 hover:text-white"><X size={20}/></button>
-        </div>
-        
-        <div className="p-4 bg-slate-50 border-b flex flex-wrap gap-4 text-sm">
-          <div><span className="text-slate-500">Khoa mượn:</span> <strong>{departmentName}</strong></div>
-          <div><span className="text-slate-500">Người nhận:</span> <strong>{borrowerName}</strong></div>
-        </div>
-
-        <div className="p-4 flex-1 overflow-x-auto">
-          {editItems.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">Giỏ mượn đang trống.</p>
-          ) : (
-            <div className="min-w-[600px]">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr className="bg-slate-100">
-                    <th className="p-2 border text-center w-10">STT</th>
-                    <th className="p-2 border">Tên Thuốc / VTYT</th>
-                    <th className="p-2 border text-center w-20">Nguồn</th>
-                    <th className="p-2 border text-center w-20">ĐVT</th>
-                    <th className="p-2 border text-center w-32 bg-blue-50 text-blue-800">SL Mượn</th>
-                    <th className="p-2 border text-center w-16">Xóa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editItems.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="p-2 border text-center text-slate-500">{index + 1}</td>
-                      <td className="p-2 border"><span className="font-bold">{item.name}</span></td>
-                      <td className="p-2 border text-center"><span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(item.category)}`}>{item.category}</span></td>
-                      <td className="p-2 border text-center">{item.unit}</td>
-                      <td className="p-2 border text-center bg-blue-50">
-                        <input type="number" min="1" value={item.borrowQty} onChange={(e) => handleQtyChange(item.id, e.target.value)} className="w-full p-2 text-center border border-blue-300 rounded font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
-                      </td>
-                      <td className="p-2 border text-center">
-                        <button onClick={() => handleRemove(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"><Trash2 size={16} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="p-4 border-t bg-slate-50 flex justify-end items-center gap-3 flex-wrap">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium">Quay lại sửa</button>
-          <button onClick={() => onConfirm(editItems, false)} disabled={editItems.length === 0} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold flex items-center gap-2"><CheckCircle size={18} /> Gửi duyệt</button>
-          <button onClick={() => onConfirm(editItems, true)} disabled={editItems.length === 0} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold flex items-center gap-2"><Printer size={18} /> Gửi duyệt & In phiếu</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- LEDGER MANAGER (SỔ MƯỢN) ---
-function LedgerManager({ user, usersData, records, setRecords, addLog, showToast, externalOpenId, clearExternalOpenId, initialPrintId, clearInitialPrintId }) {
-  const [printRecord, setPrintRecord] = useState(null);
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  const [returnRecord, setReturnRecord] = useState(null);
-  const [approveRecord, setApproveRecord] = useState(null);
-  const [confirmAction, setConfirmAction] = useState(null); 
-  
-  const [qrScannerInput, setQrScannerInput] = useState('');
-  const [showCameraScanner, setShowCameraScanner] = useState(false);
-  const qrInputRef = useRef(null);
-
-  const isDược = user.role === 'DUOC' || user.permissions.includes('APPROVE');
-
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 10000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (qrInputRef.current) qrInputRef.current.focus();
-  }, [records]); 
-
-  const executeScan = useCallback((codeToScan) => {
-    const code = codeToScan.trim();
-    if (!code) return;
-    const record = records.find(r => r.id === code);
-    if (record) {
-      if (!isDược && record.department !== user.departmentName) {
-         showToast('Bạn không có quyền truy cập phiếu của Khoa khác!', 'error');
-         return;
-      }
-      if (record.status === 'PENDING') {
-        if (isDược) setApproveRecord(record); 
-        else showToast('Phiếu này đang chờ Khoa Dược duyệt, bạn chưa thể thao tác!', 'error');
-      } else {
-        setReturnRecord(record); 
-      }
-    } else {
-      showToast('Không tìm thấy mã phiếu hợp lệ!', 'error');
-    }
-    setQrScannerInput(''); 
-  }, [records, isDược, user.departmentName, showToast]);
-
-  const handleScanQR = (e) => {
-    e.preventDefault();
-    executeScan(qrScannerInput);
-  };
-
-  useEffect(() => {
-    if (externalOpenId) {
-      const rec = records.find(r => r.id === externalOpenId);
-      if (rec) {
-        if (rec.status === 'PENDING') {
-           if (isDược) setApproveRecord(rec);
-           else showToast('Phiếu chờ duyệt, bạn chưa có quyền thao tác!', 'error');
-        } else {
-           setReturnRecord(rec);
-        }
-      }
-      clearExternalOpenId();
-    }
-  }, [externalOpenId, records, clearExternalOpenId, isDược, showToast]);
-
-  useEffect(() => {
-    if (initialPrintId) {
-      const rec = records.find(r => r.id === initialPrintId);
-      if (rec) {
-        setPrintRecord(rec);
-        setShowPrintModal(true);
-      }
-      clearInitialPrintId();
-    }
-  }, [initialPrintId, records, clearInitialPrintId]);
-
-  const visibleRecords = isDược ? records : records.filter(r => r.department === user.departmentName);
-
-  const searchedRecords = visibleRecords.filter(r => {
-    if (!qrScannerInput.trim()) return true;
-    const term = qrScannerInput.trim().toLowerCase();
-    return r.id.toLowerCase().includes(term) || r.borrowerName.toLowerCase().includes(term) || r.department.toLowerCase().includes(term);
-  });
-
-  const statusWeight = { PENDING: 0, DEBT: 1, BORROWED: 1, COMPLETED: 2, CANCELED: 3 };
-  const sortedRecords = [...searchedRecords].sort((a, b) => {
-    if (statusWeight[a.status] !== statusWeight[b.status]) return statusWeight[a.status] - statusWeight[b.status];
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
-
-  const handleRecall = (record) => {
-    setConfirmAction({
-      message: 'Bạn có chắc chắn muốn THU HỒI và XÓA phiếu mượn này?',
-      action: () => {
-        setRecords(prev => prev.filter(r => r.id !== record.id));
-        addLog('THU HỒI', `Đã thu hồi/xóa phiếu ${record.id}`, record.id);
-        showToast('Đã thu hồi và xóa phiếu thành công!');
-        setConfirmAction(null);
-      }
-    });
-  };
-
-  const handleUndo = (record) => {
-    const actionName = record.undoType === 'RETURN' ? 'TRẢ THUỐC' : 'DUYỆT ĐƠN';
-    setConfirmAction({
-      message: `Bạn có chắc chắn muốn hoàn tác thao tác ${actionName} vừa thực hiện?`,
-      action: () => {
-        const restoredRecord = record.previousState;
-        const cleanedRecord = { ...restoredRecord };
-        delete cleanedRecord.previousState; delete cleanedRecord.lastActionTime; delete cleanedRecord.undoType;
-        setRecords(prev => prev.map(r => r.id === record.id ? cleanedRecord : r));
-        addLog('HOÀN TÁC', `Đã hoàn tác thao tác ${actionName} trên phiếu ${record.id}`, record.id);
-        showToast('Đã hoàn tác thành công!');
-        setConfirmAction(null);
-      }
-    });
-  };
-
-  const processApprove = (updatedRecord) => {
-    const approvedItems = updatedRecord.items.filter(item => item.borrowQty > 0);
-    const isCanceled = approvedItems.length === 0;
-    
-    const lSig = (user.signatureStatus === 'APPROVED') ? user.signature : null;
-
-    const finalRecord = {
-      ...updatedRecord,
-      items: approvedItems,
-      status: isCanceled ? 'CANCELED' : 'BORROWED',
-      lenderName: user.name,
-      lenderPhone: user.phone || '',
-      lenderSignature: lSig,
-      approvedAt: new Date(),
-      previousState: records.find(r => r.id === updatedRecord.id),
-      lastActionTime: Date.now(),
-      undoType: 'APPROVE'
-    };
-
-    setRecords(prev => prev.map(r => r.id === finalRecord.id ? finalRecord : r));
-    addLog('DUYỆT ĐƠN', `Khoa Dược đã ${isCanceled ? 'từ chối toàn bộ' : 'duyệt'} đơn mượn mã ${finalRecord.id}`, finalRecord.id);
-    showToast(isCanceled ? 'Đã hủy phiếu do không duyệt mặt hàng nào!' : 'Đã duyệt đơn mượn thành công!');
-    setApproveRecord(null);
-  };
-
-  const processReturn = (updatedRecord) => {
-    const isDebt = updatedRecord.items.some(item => item.returnedQty < item.borrowQty);
-    const newStatus = isDebt ? 'DEBT' : 'COMPLETED';
-
-    const finalRecord = {
-      ...updatedRecord,
-      status: newStatus,
-      returnedAt: new Date(),
-      returnedBy: user.name,
-      previousState: records.find(r => r.id === updatedRecord.id),
-      lastActionTime: Date.now(),
-      undoType: 'RETURN'
-    };
-
-    setRecords(prev => prev.map(r => r.id === finalRecord.id ? finalRecord : r));
-    
-    if (isDebt) {
-      addLog('DUYỆT TRẢ', `Khoa Dược duyệt trả (CÒN NỢ) phiếu mã ${finalRecord.id}`, finalRecord.id);
-      showToast('Đã duyệt trả. Phiếu này hiện CÒN NỢ!', 'error');
-    } else {
-      addLog('DUYỆT TRẢ', `Khoa Dược duyệt trả hoàn tất phiếu mã ${finalRecord.id}`, finalRecord.id);
-      showToast('Đã duyệt trả thành công toàn bộ!');
-    }
-    setReturnRecord(null);
-  };
-
-  const handleSendNotice = (record, type) => {
-    const contact = type === 'email' ? (record.borrowerPhone || 'Chưa có Email') : (record.borrowerPhone || 'Chưa có SĐT');
-    showToast(`Đã mô phỏng gửi ${type.toUpperCase()} đến ${record.borrowerName} (${contact})`);
-    addLog('GỬI THÔNG BÁO', `Gửi thông báo nhắc nhở ${type.toUpperCase()} cho phiếu ${record.id}`, record.id);
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border p-4 min-h-[500px]">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><FileText size={24} /> Sổ Quản Lý Mượn/Trả</h2>
-        
-        <div className="flex flex-col sm:flex-row w-full sm:w-auto relative gap-2">
-          <form onSubmit={handleScanQR} className="relative w-full sm:w-72">
-            <input 
-              ref={qrInputRef}
-              type="text" 
-              placeholder="Nhập/Quét mã QR phiếu..." 
-              value={qrScannerInput}
-              onChange={(e) => setQrScannerInput(e.target.value)}
-              className="w-full p-2 pl-10 pr-20 border-2 border-blue-400 rounded-lg outline-none focus:border-blue-600 bg-blue-50 font-mono"
-            />
-            <ScanBarcode className="absolute left-3 top-2.5 text-blue-500" size={20} />
-            <button type="submit" className="absolute right-1 top-1 bottom-1 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors">Tìm</button>
-          </form>
-          <button onClick={() => setShowCameraScanner(true)} className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg flex justify-center items-center gap-1 transition-colors whitespace-nowrap" title="Quét QR bằng Camera">
-            <Camera size={20} /><span className="sm:hidden lg:inline">Quét Camera</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-slate-100 text-slate-700">
-            <tr>
-              <th className="p-3 rounded-tl-lg text-center w-12">STT</th>
-              <th className="p-3">Mã phiếu</th>
-              <th className="p-3">Khoa mượn</th>
-              <th className="p-3">Người đi mượn</th>
-              <th className="p-3">Thời gian tạo</th>
-              <th className="p-3">Trạng thái</th>
-              <th className="p-3 text-right rounded-tr-lg">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {sortedRecords.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-slate-500">Chưa có dữ liệu phiếu mượn phù hợp.</td></tr>
-            ) : (
-              sortedRecords.map((record, index) => {
-                const isCompleted = record.status === 'COMPLETED';
-                const isPending = record.status === 'PENDING';
-                const isCanceled = record.status === 'CANCELED';
-                
-                const timeSinceCreation = Date.now() - new Date(record.createdAt).getTime();
-                const daysOverdue = Math.floor(timeSinceCreation / (1000 * 60 * 60 * 24));
-                const showWarning = daysOverdue > 2 && !isCompleted && !isPending && !isCanceled;
-                
-                const canUndo = record.previousState && (Date.now() - record.lastActionTime) < 60000;
-                const isCreator = record.originalBorrowerName === user.username || record.department === user.departmentName;
-                const canRecall = isPending && isCreator && (!isDược || timeSinceCreation <= 60000);
-
-                return (
-                  <tr key={record.id} className={`transition-all duration-300 ${isCompleted || isCanceled ? 'bg-slate-50 opacity-60 hover:opacity-100' : isPending ? 'bg-purple-50' : showWarning ? 'bg-red-50/30' : 'hover:bg-blue-50'}`}>
-                    <td className="p-3 text-center font-semibold text-slate-500">{index + 1}</td>
-                    <td className="p-3 font-mono font-medium text-blue-700">{record.id}</td>
-                    <td className="p-3 font-semibold">{record.department}</td>
-                    <td className="p-3"><span>{record.borrowerName}</span></td>
-                    <td className="p-3 text-slate-500">{new Date(record.createdAt).toLocaleString('vi-VN')}</td>
-                    <td className="p-3">
-                      <div className="flex flex-col gap-1 items-start">
-                        {isPending ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><Clock size={14} /> Chờ duyệt</span>
-                        ) : isCompleted ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"><CheckCircle size={14} /> Đã trả xong</span>
-                        ) : isCanceled ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-700"><Trash2 size={14} /> Hủy / 0 duyệt</span>
-                        ) : record.status === 'DEBT' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700"><AlertCircle size={14} /> Còn nợ</span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><Clock size={14} /> Đang mượn</span>
-                        )}
-                        {showWarning && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 animate-pulse mt-1"><AlertTriangle size={12} /> Quá hạn {daysOverdue} ngày!</span>}
-                      </div>
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex justify-end gap-2 items-center flex-wrap">
-                        {canUndo && isDược && <button onClick={() => handleUndo(record)} className="px-2 py-1 bg-orange-100 text-orange-600 rounded border border-orange-300 text-xs font-bold flex items-center gap-1"><RotateCcw size={14}/> Hoàn tác</button>}
-                        {canRecall && <button onClick={() => handleRecall(record)} className="px-2 py-1 bg-red-100 text-red-600 rounded border border-red-300 text-xs font-bold flex items-center gap-1"><Trash2 size={14}/> Thu hồi</button>}
-                        {showWarning && isDược && <button onClick={() => handleSendNotice(record, 'email')} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded"><Send size={18}/></button>}
-                        {!isCanceled && <button onClick={() => handlePrint(record)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-100 rounded"><Printer size={18} /></button>}
-                        {isPending && isDược && <button onClick={() => setApproveRecord(record)} className="px-4 py-1.5 bg-purple-600 text-white rounded text-xs font-bold">Duyệt đơn</button>}
-                        {!isPending && !isCompleted && !isCanceled && isDược && <button onClick={() => setReturnRecord(record)} className={`px-3 py-1.5 text-white rounded text-xs font-bold ${record.status === 'DEBT' ? 'bg-orange-500' : 'bg-emerald-500'}`}>{record.status === 'DEBT' ? 'Nhận trả thêm' : 'Duyệt trả'}</button>}
-                        {(!isPending && (isCompleted || isCanceled || !isDược)) || (isPending && !isDược && !canRecall) ? <button onClick={() => setReturnRecord(record)} className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-xs font-medium">Xem chi tiết</button> : null}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {showCameraScanner && <QRCameraScanner onClose={() => setShowCameraScanner(false)} onScan={(code) => { setShowCameraScanner(false); executeScan(code); }} />}
-      {approveRecord && <ApproveModal record={approveRecord} onClose={() => setApproveRecord(null)} onConfirm={processApprove} />}
-      {returnRecord && <ReturnModal user={user} record={returnRecord} onClose={() => setReturnRecord(null)} onConfirm={processReturn} readOnly={returnRecord.status === 'COMPLETED' || returnRecord.status === 'CANCELED' || !isDược || returnRecord.status === 'PENDING'} onSendNotice={(rec, t) => handleSendNotice(rec, t)} />}
-      {showPrintModal && <PrintModal record={printRecord} onClose={() => setShowPrintModal(false)} showToast={showToast} />}
-      {confirmAction && <ConfirmDialog message={confirmAction.message} onConfirm={confirmAction.action} onCancel={() => setConfirmAction(null)} />}
-    </div>
-  );
-}
-
-// --- APPROVE MODAL ---
-function ApproveModal({ record, onClose, onConfirm }) {
-  const [items, setItems] = useState(record.items);
-  const [evidenceImages, setEvidenceImages] = useState(record.evidenceImages || []);
-  const [showCamera, setShowCamera] = useState(false);
-  const [viewingImages, setViewingImages] = useState(null);
-
-  const handleQtyChange = (id, newQty) => {
-    let val = parseInt(newQty);
-    if (isNaN(val) || val < 0) val = 0; 
-    setItems(items.map(item => item.id === id ? { ...item, borrowQty: val } : item));
-  };
-
-  const handleRemoveItem = (id) => {
-    setItems(items.map(item => item.id === id ? { ...item, borrowQty: 0 } : item));
-  };
-
-  const submitApprove = () => onConfirm({ ...record, items, evidenceImages });
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-purple-700 text-white p-4 flex justify-between items-center">
-          <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle size={20} /> Duyệt đơn mượn thuốc - {record.id}</h3>
-          <button onClick={onClose} className="text-purple-200 hover:text-white"><X size={20}/></button>
-        </div>
-        <div className="p-4 bg-purple-50 border-b flex flex-wrap gap-4 text-sm justify-between items-center">
-          <div className="flex gap-4 flex-wrap">
-            <div><span className="text-purple-600/70">Khoa mượn:</span> <strong className="text-purple-900">{record.department}</strong></div>
-            <div><span className="text-purple-600/70">Người mượn:</span> <strong className="text-purple-900">{record.borrowerName}</strong></div>
-            <div><span className="text-purple-600/70">Thời gian:</span> <span className="text-purple-900">{new Date(record.createdAt).toLocaleString('vi-VN')}</span></div>
-          </div>
-          {evidenceImages.length > 0 && (
-             <button onClick={() => setViewingImages(evidenceImages)} className="flex items-center gap-1 text-xs px-2 py-1 bg-purple-200 text-purple-800 rounded font-bold shadow-sm">
-               <ImageIcon size={14}/> Xem ảnh duyệt đơn ({evidenceImages.length})
-             </button>
-          )}
-        </div>
-        <div className="p-4 flex-1 overflow-x-auto">
-          <div className="min-w-[700px]">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="p-2 border text-center w-10">STT</th>
-                  <th className="p-2 border text-center w-20">Mã</th>
-                  <th className="p-2 border">Tên Thuốc / VTYT</th>
-                  <th className="p-2 border text-center">Nguồn</th>
-                  <th className="p-2 border text-center">ĐVT</th>
-                  <th className="p-2 border text-center w-32 bg-purple-100 text-purple-800">SL Duyệt Mượn</th>
-                  <th className="p-2 border text-center w-16">Xóa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => (
-                  <tr key={item.id} className={item.borrowQty === 0 ? 'bg-red-50 opacity-60' : ''}>
-                    <td className="p-2 border text-center text-slate-500">{index + 1}</td>
-                    <td className="p-2 border text-center font-mono text-xs">{item.id}</td>
-                    <td className="p-2 border">
-                      <span className="font-bold">{item.name}</span>
-                      {item.activeIngredient && <span className="ml-1 text-slate-600">({item.activeIngredient})</span>}
-                    </td>
-                    <td className="p-2 border text-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(item.category)}`}>{item.category}</span>
-                    </td>
-                    <td className="p-2 border text-center">{item.unit}</td>
-                    <td className="p-2 border text-center bg-purple-50">
-                      <input type="number" min="0" value={item.borrowQty} onChange={(e) => handleQtyChange(item.id, e.target.value)} className="w-full p-2 text-center border rounded font-bold outline-none focus:ring-2 bg-white" />
-                    </td>
-                    <td className="p-2 border text-center">
-                       <button onClick={() => handleQtyChange(item.id, 0)} className="text-red-500 hover:bg-red-100 p-1.5 rounded"><Trash2 size={18}/></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-slate-500 mt-3 italic">* Khoa Dược có thể kiểm tra tồn kho và sửa lượng duyệt về 0 (hoặc ấn thùng rác) nếu hết thuốc. Những món = 0 sẽ tự động bị xóa khỏi phiếu.</p>
-        </div>
-        <div className="p-4 border-t bg-slate-50 flex justify-between items-center gap-3">
-          <button onClick={() => setShowCamera(true)} className="p-2 bg-slate-200 text-slate-700 rounded-lg flex items-center gap-2"><Camera size={18} /> Chụp ảnh</button>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-2 bg-slate-200 text-slate-800 rounded font-medium">Đóng</button>
-            <button onClick={submitApprove} className="px-6 py-2 bg-purple-600 text-white rounded font-bold"><CheckCircle size={18} className="inline mr-1" /> Duyệt</button>
-          </div>
-        </div>
-      </div>
-      {showCamera && <CameraCapture onClose={() => setShowCamera(false)} onCapture={(img) => { setEvidenceImages([...evidenceImages, img]); setShowCamera(false); }} />}
-      {viewingImages && <ImageViewerModal images={viewingImages} onClose={() => setViewingImages(null)} />}
-    </div>
-  );
-}
-
-// --- RETURN MODAL ---
-function ReturnModal({ user, record, onClose, onConfirm, readOnly, onSendNotice }) {
-  const [sessionReturns, setSessionReturns] = useState(record.items.map(item => ({ id: item.id, qty: readOnly ? 0 : (item.borrowQty - (item.returnedQty ?? 0)) })));
-  const [sessionImages, setSessionImages] = useState([]);
-  const [showCamera, setShowCamera] = useState(false);
-  const [viewingImages, setViewingImages] = useState(null);
-
-  const submitReturn = () => {
-    const curSession = (record.returnSessions || 0) + 1;
-    const now = new Date();
-    const processorSig = (user.signatureStatus === 'APPROVED') ? user.signature : null;
-    
-    const updatedItems = record.items.map(item => {
-      const retQty = sessionReturns.find(s => s.id === item.id)?.qty || 0;
-      return { 
-        ...item, 
-        returnedQty: (item.returnedQty||0) + retQty, 
-        returnHistory: [...(item.returnHistory||[]), { session: curSession, qty: retQty, date: now, processor: user.name }] 
-      };
-    });
-    
-    const newEvents = [...(record.returnEvents||[]), { 
-      session: curSession, date: now, images: sessionImages, processor: user.name, processorSignature: processorSig 
-    }];
-
-    onConfirm({ ...record, items: updatedItems, returnSessions: curSession, returnEvents: newEvents });
-  };
-
-  const totalRet = sessionReturns.reduce((sum, s) => sum + s.qty, 0);
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-blue-700 text-white p-4 flex justify-between items-center">
-          <h3 className="font-bold text-lg flex items-center gap-2">{readOnly ? <Eye size={20}/> : <ShoppingCart size={20}/>} {readOnly ? 'Chi tiết phiếu' : 'Xác nhận trả thuốc'} - {record.id}</h3>
-          <button onClick={onClose} className="text-blue-200 hover:text-white"><X size={20}/></button>
-        </div>
-        <div className="p-4 bg-slate-50 border-b flex flex-wrap gap-4 text-sm justify-between">
-          <div className="flex gap-4 flex-wrap items-center">
-            <div><span className="text-slate-500">Khoa mượn:</span> <strong>{record.department}</strong></div>
-            <div><span className="text-slate-500">Người mượn:</span> <strong>{record.borrowerName}</strong></div>
-            <div><span className="text-slate-500">Ngày tạo:</span> {new Date(record.createdAt).toLocaleString('vi-VN')}</div>
-            {record.evidenceImages?.length > 0 && (
-               <button onClick={() => setViewingImages(record.evidenceImages)} className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200 shadow-sm ml-2">
-                 <ImageIcon size={14}/> Xem ảnh duyệt đơn
-               </button>
-            )}
-          </div>
-          {(readOnly || record.status === 'DEBT') && !readOnly && record.status !== 'PENDING' && (
-            <div className="flex gap-2">
-              <button onClick={() => onSendNotice(record, 'sms')} className="flex items-center gap-1 text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition border border-green-200"><Smartphone size={14}/> Báo SĐT</button>
-              <button onClick={() => onSendNotice(record, 'email')} className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition border border-blue-200"><Mail size={14}/> Gửi Email</button>
-            </div>
-          )}
-        </div>
-        <div className="p-4 flex-1 overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse min-w-[850px]">
-            <thead>
-              <tr className="bg-slate-100"><th className="p-2 border">Thuốc/VTYT</th><th className="p-2 border text-center">Mượn</th><th className="p-2 border text-center w-[250px]">Chi tiết các lần trả</th><th className="p-2 border text-center">Trả đợt này</th></tr>
-            </thead>
-            <tbody>
-              {record.items.map(item => {
-                const rem = item.borrowQty - (item.returnedQty||0);
-                const sQty = sessionReturns.find(s=>s.id===item.id)?.qty||0;
-                return (
-                  <tr key={item.id}>
-                    <td className="p-2 border">
-                      <span className="font-bold">{item.name}</span>
-                      {item.activeIngredient && <span className="ml-1 text-slate-600">({item.activeIngredient})</span>}
-                      <br/><span className="font-mono text-xs text-slate-400 mt-1">{item.id}</span>
-                    </td>
-                    <td className="p-2 border text-center font-bold text-blue-700">{item.borrowQty} {item.unit}</td>
-                    <td className="p-2 border text-xs bg-slate-50">
-                       <div className="flex justify-between font-bold border-b pb-1 mb-1">
-                          <span>Đã trả: {(item.returnedQty||0)}/{item.borrowQty}</span>
-                       </div>
-                       <div className="flex flex-col gap-1">
-                          {item.returnHistory?.map((h, i) => {
-                             const ev = record.returnEvents?.find(e => e.session === h.session);
-                             return (
-                             <div key={i} className="bg-white border rounded p-1.5 flex flex-col gap-1 shadow-sm">
-                               <div className="flex justify-between items-center">
-                                 <span className="text-slate-700">Lần {h.session}: <strong className="text-slate-900 text-sm">{h.qty}</strong></span>
-                                 {ev?.images?.length > 0 && (
-                                   <button onClick={() => setViewingImages(ev.images)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded" title="Xem ảnh minh chứng">
-                                     <ImageIcon size={14}/>
-                                   </button>
-                                 )}
-                               </div>
-                               <div className="flex justify-between items-end border-t border-dashed pt-1 mt-1">
-                                 <i className="text-slate-400 text-[9px]">{new Date(h.date).toLocaleString('vi-VN')}</i>
-                                 {ev?.processorSignature ? (
-                                   <div className="flex flex-col items-end"><img src={ev.processorSignature} alt="sig" className="h-6 object-contain" /><span className="text-[8px] text-slate-400">{h.processor}</span></div>
-                                 ) : <span className="text-[9px] text-slate-500">{h.processor}</span>}
-                               </div>
-                             </div>
-                          )})}
-                       </div>
-                    </td>
-                    <td className="p-2 border text-center bg-emerald-50">
-                      {readOnly || rem === 0 ? <span className="text-slate-400">{rem===0?'(Đủ)':'-'}</span> : (
-                        <input type="number" min="0" max={rem} value={sQty} onChange={(e) => setSessionReturns(sessionReturns.map(s => s.id === item.id ? { ...s, qty: Math.min(Math.max(0, parseInt(e.target.value)||0), rem) } : s))} className="w-20 p-1 text-center border border-emerald-300 rounded font-bold outline-none focus:ring-2" />
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!readOnly && (
-             <div className="mt-4 p-4 border border-emerald-200 rounded-lg bg-emerald-50">
-               <button onClick={() => setShowCamera(true)} className="px-3 py-1.5 bg-white border rounded flex items-center gap-1"><Camera size={14}/> Chụp minh chứng đợt này</button>
-               {sessionImages.length > 0 && (
-                 <div className="flex gap-2 mt-2 overflow-x-auto">
-                   {sessionImages.map((img, i) => (
-                      <div key={i} className="relative w-16 h-16 shrink-0"><img src={img} className="w-full h-full object-cover rounded border" alt=""/><button onClick={() => setSessionImages(sessionImages.filter((_,idx)=>idx!==i))} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5"><X size={10}/></button></div>
-                   ))}
-                 </div>
-               )}
-             </div>
-          )}
-        </div>
-        <div className="p-4 border-t bg-slate-50 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-200 rounded font-medium">Đóng</button>
-          {!readOnly && <button onClick={submitReturn} disabled={totalRet===0} className="px-6 py-2 text-white bg-emerald-600 rounded font-bold">Duyệt hoàn trả</button>}
-        </div>
-      </div>
-      {showCamera && <CameraCapture onClose={() => setShowCamera(false)} onCapture={(img) => { setSessionImages([...sessionImages, img]); setShowCamera(false); }} />}
-      {viewingImages && <ImageViewerModal images={viewingImages} onClose={() => setViewingImages(null)} />}
-    </div>
-  );
-}
-
-// --- PRINT MODAL & PREVIEW ---
-function PrintModal({ record, onClose, showToast }) {
-  const [isDownloading, setIsDownloading] = useState(false);
-
-  const handleDownloadImage = () => {
-    const el = document.getElementById('print-area');
-    if(!el) return;
-    setIsDownloading(true);
-    window.html2canvas(el, { 
-      scale: 2, 
-      useCORS: true,
-      backgroundColor: '#ffffff'
-    }).then(canvas => {
-      const link = document.createElement('a');
-      link.download = `Phieu_${record.id}.png`;
-      link.href = canvas.toDataURL('image/png'); link.click();
-      setIsDownloading(false);
-    }).catch(() => {
-      if(showToast) showToast("Lỗi tạo ảnh", "error");
-      setIsDownloading(false);
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[60] p-4">
-      <div className="bg-slate-200 rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[95vh] flex flex-col overflow-hidden">
-        <div className="bg-white p-4 flex justify-between items-center border-b">
-          <h3 className="font-bold text-lg flex items-center gap-2"><Printer size={20} className="text-blue-600" /> Bản xem trước phiếu in</h3>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">Đóng</button>
-            <button onClick={handleDownloadImage} disabled={isDownloading} className="px-4 py-2 bg-emerald-600 text-white rounded-lg flex gap-1"><Download size={18}/> {isDownloading ? 'Đang tải...' : 'Tải ảnh'}</button>
-            <button onClick={() => window.print()} className="px-6 py-2 bg-blue-600 text-white rounded-lg flex gap-1"><Printer size={18}/> In Phiếu</button>
-          </div>
-        </div>
-        <div className="p-6 overflow-auto flex-1 flex justify-center bg-slate-200">
-           <div className="bg-white shadow-md print-override relative" style={{ width: '800px', boxSizing: 'border-box' }}>
-              <PrintPreview record={record} />
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PrintPreview({ record }) {
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${record.id}`;
-  const thuocItems = record.items.filter(item => item.type === 'THUOC');
-  const vtytItems = record.items.filter(item => item.type === 'VTYT');
-  let rowCounter = 1;
-  const hasHistory = record.items.some(i => i.returnHistory?.length > 0);
-
-  return (
-    <div id="print-area" className="bg-white text-black p-8 mx-auto" style={{ width: '800px', fontFamily: '"Times New Roman", Times, serif' }}>
-      <div className="flex justify-between items-start mb-6 border-b border-slate-400 pb-4">
-        <div className="flex items-center gap-3">
-          <img crossOrigin="anonymous" src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo BV" className="h-16 w-16" />
-          <div><h2 className="font-bold text-lg uppercase m-0 p-0">KHOA DƯỢC</h2><p className="text-sm font-semibold m-0 p-0">Hệ thống quản lý mượn thuốc</p></div>
-        </div>
-        <div className="text-center pr-4">
-          <img crossOrigin="anonymous" src={qrUrl} alt="QR Code" className="w-20 h-20 mx-auto" />
-          <p className="text-xs mt-1 font-mono m-0 p-0">{record.id}</p>
-        </div>
-      </div>
-
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold uppercase m-0 mb-1">PHIẾU MƯỢN THUỐC / VTYT</h1>
-        <p className="text-sm italic m-0">Thời gian tạo: {new Date(record.createdAt).toLocaleString('vi-VN')}</p>
-      </div>
-
-      <div className="mb-6 space-y-2 text-sm">
-        <p className="m-0"><strong>Người giao (Khoa Dược):</strong> {record.lenderName || '..........................'} - <strong>SĐT:</strong> {record.lenderPhone || '..........................'}</p>
-        <p className="m-0"><strong>Người nhận ({record.department}):</strong> {record.borrowerName} - <strong>SĐT:</strong> {record.borrowerPhone || '..........................'}</p>
-      </div>
-
-      <table className="w-full text-left text-sm border-collapse mb-8 border border-black">
-        <thead>
-          <tr>
-            <th className="border border-black p-2 text-center">STT</th>
-            <th className="border border-black p-2 text-center">Mã</th>
-            <th className="border border-black p-2">Thuốc / VTYT</th>
-            <th className="border border-black p-2 text-center">Nguồn</th>
-            <th className="border border-black p-2 text-center">SL</th>
-            <th className="border border-black p-2 text-center">ĐVT</th>
-            {hasHistory && <th className="border border-black p-2">Lịch sử trả</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {[...thuocItems, ...vtytItems].map(item => {
-            const retQty = item.returnedQty || 0;
-            return (
-              <tr key={item.id}>
-                <td className="border border-black p-2 text-center">{rowCounter++}</td>
-                <td className="border border-black p-2 text-center font-mono text-xs">{item.id}</td>
-                <td className="border border-black p-2">
-                  <span className="font-bold">{item.name}</span>
-                  {item.activeIngredient && <span className="ml-1">({item.activeIngredient})</span>}
-                </td>
-                <td className="border border-black p-2 text-center font-bold">
-                  {/* Sử dụng style cứng cho bản in để giữ nền màu */}
-                  <span style={{ 
-                    backgroundColor: item.category === 'BH' ? '#3b82f6' : '#ec4899', 
-                    color: 'white', 
-                    padding: '2px 6px', 
-                    borderRadius: '4px', 
-                    fontSize: '10px',
-                    WebkitPrintColorAdjust: 'exact', 
-                    printColorAdjust: 'exact' 
-                  }}>{item.category}</span>
-                </td>
-                <td className="border border-black p-2 text-center font-bold">{item.borrowQty}</td>
-                <td className="border border-black p-2 text-center">{item.unit}</td>
-                {hasHistory && (
-                  <td className="border border-black p-2 text-xs">
-                    {item.returnHistory?.map((h,i) => {
-                      const ev = record.returnEvents?.find(e => e.session === h.session);
-                      return (
-                      <div key={i} className="mb-1 pb-1 border-b border-dashed border-slate-300 last:border-0 flex justify-between items-center">
-                        <div>
-                          - Lần {h.session}: <b>{h.qty}</b> <br/>
-                          <i className="text-slate-500 text-[9px]">({new Date(h.date).toLocaleString('vi-VN')})</i>
-                        </div>
-                        {ev?.processorSignature ? (
-                          <div className="flex flex-col items-center ml-2">
-                            <img crossOrigin="anonymous" src={ev.processorSignature} alt="sig" className="h-5 object-contain" />
-                          </div>
-                        ) : <span className="text-[9px] ml-2">{h.processor}</span>}
-                      </div>
-                    )})}
-                    <div className="mt-1 font-bold pt-1 border-t border-slate-300">{item.borrowQty === 0 ? 'Từ chối' : retQty >= item.borrowQty ? '✓ Đủ' : `⚠ Nợ ${item.borrowQty - retQty}`}</div>
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <div className="flex justify-between px-10 text-sm mb-20 mt-10">
-        <div className="text-center w-1/2 flex flex-col items-center">
-          <p className="font-bold m-0">Người giao (Khoa Dược)</p>
-          <p className="italic text-xs mt-1 mb-2">(Ký, ghi rõ họ tên)</p>
-          {record.lenderSignature ? (
-             <>
-               <img crossOrigin="anonymous" src={record.lenderSignature} alt="CK" className="h-16 object-contain" />
-               <p className="text-[10px] text-slate-500 mt-1 m-0">Ký điện tử: {record.lenderName}<br/>{record.approvedAt ? new Date(record.approvedAt).toLocaleString('vi-VN') : ''}</p>
-             </>
-          ) : <div className="h-16"></div>}
-          <p className="mt-2 font-medium m-0">{record.lenderName || '....................'}</p>
-        </div>
-        <div className="text-center w-1/2 flex flex-col items-center">
-          <p className="font-bold m-0">Người nhận ({record.department})</p>
-          <p className="italic text-xs mt-1 mb-2">(Ký, ghi rõ họ tên)</p>
-          {record.borrowerSignature ? (
-             <>
-               <img crossOrigin="anonymous" src={record.borrowerSignature} alt="CK" className="h-16 object-contain" />
-               <p className="text-[10px] text-slate-500 mt-1 m-0">Ký điện tử: {record.borrowerName}<br/>{new Date(record.createdAt).toLocaleString('vi-VN')}</p>
-             </>
-          ) : <div className="h-16"></div>}
-          <p className="mt-2 font-medium m-0">{record.borrowerName}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- LOGS VIEWER ---
-function LogsViewer({ logs, onViewRecord }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border p-4">
-      <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><History size={20} /> Nhật ký hệ thống</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="p-3">Thời gian</th><th className="p-3">Người dùng</th><th className="p-3">Khoa / Phòng</th>
-              <th className="p-3">Thao tác</th><th className="p-3">Chi tiết</th><th className="p-3 text-right">Hành động</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {logs.map(log => (
-              <tr key={log.id} className="hover:bg-slate-50">
-                <td className="p-3 text-slate-500">{new Date(log.time).toLocaleString('vi-VN')}</td>
-                <td className="p-3 font-medium">{log.user}</td>
-                <td className="p-3 text-slate-600">{log.department}</td>
-                <td className="p-3"><span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">{log.action}</span></td>
-                <td className="p-3 text-slate-700">{log.details}</td>
-                <td className="p-3 text-right">
-                  {log.recordId && <button onClick={() => onViewRecord(log.recordId)} className="text-blue-600 font-medium">Xem phiếu</button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// --- SETTINGS & ADMIN ---
-function SettingsManager({ user, updateUserSession, usersData, setUsersData, onResetData, showToast }) {
-  const isAdmin = user.permissions.includes('ADMIN') || user.role === 'DUOC';
-  const [activeSetting, setActiveSetting] = useState('PROFILE');
-
-  const [profName, setProfName] = useState(user.name);
-  const [profPhone, setProfPhone] = useState(user.phone || '');
-  const [profEmail, setProfEmail] = useState(user.email || '');
-  const [showSigPad, setShowSigPad] = useState(false);
-
-  const [oldPass, setOldPass] = useState('');
-  const [newPass, setNewPass] = useState('');
-
-  const handleUpdateProfile = (e) => {
-    e.preventDefault();
-    setUsersData(usersData.map(u => u.username === user.username ? { ...u, name: profName, phone: profPhone, email: profEmail } : u));
-    updateUserSession({ name: profName, phone: profPhone, email: profEmail });
-    showToast('Đã cập nhật thông tin cá nhân!');
-  };
-
-  const handleSaveSignature = (sigData) => {
-    setUsersData(usersData.map(u => u.username === user.username ? { ...u, signature: sigData, signatureStatus: 'PENDING' } : u));
-    updateUserSession({ signature: sigData, signatureStatus: 'PENDING' });
-    showToast('Chữ ký đã được lưu và gửi chờ phê duyệt!');
-    setShowSigPad(false);
-  };
-
-  const approveSignature = (username) => {
-    setUsersData(usersData.map(u => u.username === username ? { ...u, signatureStatus: 'APPROVED' } : u));
-    if (user.username === username) updateUserSession({ signatureStatus: 'APPROVED' });
-    showToast(`Đã duyệt chữ ký cho ${username}`);
-  };
-  
-  const rejectSignature = (username) => {
-    setUsersData(usersData.map(u => u.username === username ? { ...u, signature: null, signatureStatus: 'NONE' } : u));
-    if (user.username === username) updateUserSession({ signature: null, signatureStatus: 'NONE' });
-    showToast(`Đã từ chối chữ ký của ${username}`);
-  };
-
-  const pendingSigs = usersData.filter(u => u.signatureStatus === 'PENDING');
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border p-4 md:p-8 max-w-6xl mx-auto">
-      <h2 className="text-2xl font-bold flex items-center gap-2 mb-6 text-slate-800">
-        <Settings size={28} className="text-blue-600" /> Cài đặt & Quản lý
-      </h2>
-      <div className="flex flex-col md:flex-row gap-8">
-        <div className="w-full md:w-64 flex flex-col gap-2 shrink-0">
-          <button onClick={() => setActiveSetting('PROFILE')} className={`p-3 rounded-lg text-left font-medium transition-colors flex items-center gap-3 ${activeSetting === 'PROFILE' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'hover:bg-slate-50 text-slate-600'}`}>
-            <UserCircle size={18} /> Hồ sơ cá nhân
-          </button>
-          
-          {isAdmin && (
-            <>
-              <div className="h-px bg-slate-200 my-2"></div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3">Quản Trị</p>
-              <button onClick={() => setActiveSetting('SIGS')} className={`p-3 rounded-lg text-left font-medium transition-colors flex items-center gap-3 ${activeSetting === 'SIGS' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'hover:bg-slate-50 text-slate-600'}`}>
-                <PenTool size={18} /> Duyệt chữ ký số {pendingSigs.length > 0 && <span className="bg-red-500 text-white rounded-full px-1.5 text-xs">{pendingSigs.length}</span>}
-              </button>
-              <button onClick={() => setActiveSetting('DATA')} className={`p-3 rounded-lg text-left font-medium transition-colors flex items-center gap-3 ${activeSetting === 'DATA' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'hover:bg-slate-50 text-slate-600'}`}>
-                <Database size={18} /> Khởi tạo dữ liệu
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          {activeSetting === 'PROFILE' && (
-            <div className="animate-in fade-in max-w-lg space-y-6">
-               <div className="border p-6 rounded-xl bg-slate-50">
-                 <h3 className="text-lg font-bold border-b pb-2 mb-4">Chữ ký số</h3>
-                 <div className="flex items-center gap-6 mb-4">
-                    <div className="h-24 w-48 bg-white border-2 border-dashed border-slate-300 rounded flex items-center justify-center">
-                       {user.signature ? <img src={user.signature} alt="CK" className="h-full object-contain p-2" /> : <span className="text-slate-400 text-sm">Chưa có chữ ký</span>}
-                    </div>
-                    <div>
-                       <p className="text-sm text-slate-600 mb-1">Trạng thái:</p>
-                       {user.signatureStatus === 'APPROVED' ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 font-bold rounded text-xs flex items-center gap-1 w-max"><Check size={14}/> Đã duyệt hợp lệ</span> :
-                        user.signatureStatus === 'PENDING' ? <span className="px-2 py-1 bg-amber-100 text-amber-700 font-bold rounded text-xs flex items-center gap-1 w-max"><Clock size={14}/> Đang chờ duyệt</span> :
-                        <span className="px-2 py-1 bg-slate-200 text-slate-600 font-bold rounded text-xs w-max">Chưa khởi tạo</span>}
-                    </div>
-                 </div>
-                 <button onClick={() => setShowSigPad(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-sm shadow-sm">
-                    {user.signature ? 'Ký lại chữ ký khác' : 'Tạo chữ ký số'}
-                 </button>
-               </div>
-
-               <div className="border p-6 rounded-xl bg-slate-50">
-                 <h3 className="text-lg font-bold border-b pb-2 mb-4">Thông tin cá nhân</h3>
-                 <form onSubmit={handleUpdateProfile} className="space-y-4">
-                    <div><label className="block text-sm font-medium mb-1">Họ và Tên</label><input required type="text" value={profName} onChange={e=>setProfName(e.target.value)} className="w-full p-2 border rounded" /></div>
-                    <div><label className="block text-sm font-medium mb-1">SĐT</label><input type="text" value={profPhone} onChange={e=>setProfPhone(e.target.value)} className="w-full p-2 border rounded" /></div>
-                    <button type="submit" className="w-full py-2 bg-slate-800 text-white rounded font-bold">Lưu thông tin</button>
-                 </form>
-               </div>
-            </div>
-          )}
-
-          {activeSetting === 'SIGS' && isAdmin && (
-            <div className="animate-in fade-in">
-              <h3 className="text-lg font-bold border-b pb-2 mb-4">Yêu cầu duyệt chữ ký</h3>
-              {pendingSigs.length === 0 ? (
-                <p className="text-slate-500 italic">Không có yêu cầu chờ duyệt nào.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {pendingSigs.map(u => (
-                    <div key={u.username} className="border p-4 rounded-xl shadow-sm bg-white">
-                      <p className="font-bold text-blue-700 mb-1">{u.name} <span className="text-xs text-slate-500 font-normal">({u.username})</span></p>
-                      <div className="h-20 bg-slate-50 border rounded mb-3 flex items-center justify-center p-1">
-                        <img src={u.signature} alt="CK" className="h-full object-contain" />
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => approveSignature(u.username)} className="flex-1 py-1.5 bg-emerald-600 text-white font-bold rounded text-sm">Phê duyệt</button>
-                        <button onClick={() => rejectSignature(u.username)} className="flex-1 py-1.5 bg-red-100 text-red-600 font-bold rounded text-sm hover:bg-red-200">Từ chối</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeSetting === 'DATA' && isAdmin && (
-            <div className="animate-in fade-in max-w-md">
-              <div className="border border-amber-200 rounded-xl p-6 bg-amber-50 shadow-sm">
-                <h3 className="font-bold text-lg mb-2 text-amber-700">Dữ liệu thử nghiệm</h3>
-                <p className="text-sm text-slate-600 mb-4">Xóa toàn bộ phiếu mượn và nhật ký hệ thống hiện tại. Tài khoản và chữ ký không bị mất.</p>
-                <button onClick={onResetData} className="w-full py-2 bg-amber-500 text-white rounded-lg font-bold shadow-sm">Khởi tạo lại CSDL</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      {showSigPad && <SignaturePad onSave={handleSaveSignature} onClose={() => setShowSigPad(false)} />}
-    </div>
-  );
-}
-
-function NavButton({ active, onClick, icon, label }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${active ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
-    >
-      {icon} {label}
-    </button>
-  );
-}
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/index.html b/index.html
+index bdb13faaff4ae3b2c2272c653dba3bee7bddc779..6e935e87ebc120d1d88a76a1799930549e7976d4 100644
+--- a/index.html
++++ b/index.html
+@@ -1,1731 +1,48 @@
+-import React, { useState, useEffect, useRef, useCallback } from 'react';
+-import { 
+-  Search, Plus, ShoppingCart, Trash2, Printer, 
+-  CheckCircle, Clock, FileText, LogOut, 
+-  History, AlertCircle, ScanBarcode, Download, Camera, Eye, AlertTriangle,
+-  Settings, Database, Users, Lock, UserPlus, ShieldCheck, UserCircle, X, Image as ImageIcon,
+-  RotateCcw, Send, Mail, Smartphone, QrCode, Pencil, PenTool, Check
+-} from 'lucide-react';
+-
+-// --- MOCK DATA ---
+-const MOCK_MEDICINES = [
+-  { id: 'M001', name: 'Paracetamol', activeIngredient: 'Paracetamol 500mg', unit: 'Viên', stock: 5000, type: 'THUOC', category: 'BH' },
+-  { id: 'M002', name: 'Natri Clorid 0.9%', activeIngredient: 'Natri Clorid 0.9% 500ml', unit: 'Chai', stock: 1200, type: 'THUOC', category: 'BH' },
+-  { id: 'M003', name: 'Bơm tiêm 5ml', activeIngredient: '', unit: 'Cái', stock: 10000, type: 'VTYT', category: 'DV' },
+-  { id: 'M004', name: 'Gạc vô khuẩn 10x10', activeIngredient: '', unit: 'Gói', stock: 3000, type: 'VTYT', category: 'BH' },
+-  { id: 'M005', name: 'Adrenalin', activeIngredient: 'Adrenalin 1mg/1ml', unit: 'Ống', stock: 500, type: 'THUOC', category: 'BH' },
+-  { id: 'M006', name: 'Dây truyền dịch', activeIngredient: '', unit: 'Sợi', stock: 2500, type: 'VTYT', category: 'DV' },
+-  { id: 'M007', name: 'Găng tay y tế', activeIngredient: 'Size M', unit: 'Hộp', stock: 150, type: 'VTYT', category: 'DV' },
+-  { id: 'M008', name: 'Cefotaxim', activeIngredient: 'Cefotaxim 1g', unit: 'Lọ', stock: 800, type: 'THUOC', category: 'BH' },
+-];
+-
+-const DEPARTMENTS = [
+-  { id: 'D01', name: 'Khoa Dược', role: 'DUOC' },
+-  { id: 'K01', name: 'Khoa Cấp cứu', role: 'KHOA' },
+-  { id: 'K02', name: 'Khoa Hồi sức tích cực', role: 'KHOA' },
+-  { id: 'K03', name: 'Khoa Ngoại Tổng hợp', role: 'KHOA' },
+-  { id: 'K04', name: 'Khoa Nội Tổng hợp', role: 'KHOA' },
+-];
+-
+-const INITIAL_USERS = [
+-  { username: 'duoc', password: '123', name: 'Nguyễn Văn Dược', phone: '0981234567', email: 'duoc@bv.vn', departmentId: 'D01', permissions: ['ADMIN', 'APPROVE', 'BORROW'], signature: null, signatureStatus: 'NONE' },
+-  { username: 'capcuu', password: '123', name: 'Trần Cấp Cứu', phone: '0912345678', email: 'capcuu@bv.vn', departmentId: 'K01', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
+-  { username: 'hoisuc', password: '123', name: 'Lê Hồi Sức', phone: '0901112233', email: 'hoisuc@bv.vn', departmentId: 'K02', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
+-  { username: 'ngoai', password: '123', name: 'Phạm Ngoại Khoa', phone: '0933445566', email: 'ngoai@bv.vn', departmentId: 'K03', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
+-  { username: 'noi', password: '123', name: 'Hoàng Nội Khoa', phone: '0977889900', email: 'noi@bv.vn', departmentId: 'K04', permissions: ['BORROW'], signature: null, signatureStatus: 'NONE' },
+-];
+-
+-const INITIAL_RECORDS = [];
+-
+-// --- HELPER COMPONENTS ---
+-const getBadgeStyle = (category) => {
+-  return category === 'BH' 
+-    ? 'bg-blue-500 text-white border-blue-600 shadow-sm' 
+-    : 'bg-pink-500 text-white border-pink-600 shadow-sm';
+-};
+-
+-function ConfirmDialog({ message, onConfirm, onCancel }) {
+-  return (
+-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+-        <div className="p-6">
+-          <div className="flex items-center gap-3 text-amber-600 mb-4">
+-            <AlertTriangle size={24} />
+-            <h3 className="font-bold text-lg text-slate-800">Xác nhận thao tác</h3>
+-          </div>
+-          <p className="text-slate-700 font-medium">{message}</p>
+-        </div>
+-        <div className="p-4 bg-slate-50 border-t flex justify-end gap-3">
+-          <button onClick={onCancel} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium transition-colors">Hủy</button>
+-          <button onClick={onConfirm} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-colors shadow-sm">Đồng ý</button>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- IMAGE VIEWER MODAL (LIGHTBOX) ---
+-function ImageViewerModal({ images, onClose }) {
+-  return (
+-    <div className="fixed inset-0 bg-black/95 z-[110] flex flex-col items-center justify-center p-4">
+-      <div className="absolute top-4 right-4 flex gap-4">
+-         <button onClick={onClose} className="text-white bg-slate-800 p-2 rounded-full hover:bg-slate-700 transition-colors shadow-lg"><X size={24}/></button>
+-      </div>
+-      <div className="flex gap-4 overflow-x-auto w-full max-w-6xl snap-x py-4 hide-scrollbar">
+-        {images.map((img, i) => (
+-          <img key={i} src={img} alt="Evidence" className="h-[80vh] w-auto max-w-full object-contain snap-center border border-slate-700 mx-auto" />
+-        ))}
+-      </div>
+-      {images.length > 1 && <p className="text-slate-400 mt-2 text-sm italic animate-pulse">Cuộn ngang để xem các ảnh khác</p>}
+-    </div>
+-  );
+-}
+-
+-// --- SIGNATURE PAD COMPONENT ---
+-function SignaturePad({ onSave, onClose }) {
+-  const canvasRef = useRef(null);
+-  const [isDrawing, setIsDrawing] = useState(false);
+-
+-  useEffect(() => {
+-    const canvas = canvasRef.current;
+-    canvas.width = canvas.offsetWidth;
+-    canvas.height = canvas.offsetHeight;
+-    const ctx = canvas.getContext('2d');
+-    ctx.lineWidth = 3;
+-    ctx.lineCap = 'round';
+-    ctx.strokeStyle = '#0f172a'; // dark slate
+-  }, []);
+-
+-  const getCoordinates = (e) => {
+-    const canvas = canvasRef.current;
+-    const rect = canvas.getBoundingClientRect();
+-    if (e.touches && e.touches.length > 0) {
+-      return {
+-        x: e.touches[0].clientX - rect.left,
+-        y: e.touches[0].clientY - rect.top
+-      };
+-    }
+-    return {
+-      x: e.clientX - rect.left,
+-      y: e.clientY - rect.top
+-    };
+-  };
+-
+-  const startDrawing = (e) => {
+-    e.preventDefault();
+-    const { x, y } = getCoordinates(e);
+-    const ctx = canvasRef.current.getContext('2d');
+-    ctx.beginPath();
+-    ctx.moveTo(x, y);
+-    setIsDrawing(true);
+-  };
+-
+-  const draw = (e) => {
+-    e.preventDefault();
+-    if (!isDrawing) return;
+-    const { x, y } = getCoordinates(e);
+-    const ctx = canvasRef.current.getContext('2d');
+-    ctx.lineTo(x, y);
+-    ctx.stroke();
+-  };
+-
+-  const stopDrawing = () => {
+-    if (!isDrawing) return;
+-    const ctx = canvasRef.current.getContext('2d');
+-    ctx.closePath();
+-    setIsDrawing(false);
+-  };
+-
+-  const clear = () => {
+-    const canvas = canvasRef.current;
+-    const ctx = canvas.getContext('2d');
+-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+-  };
+-
+-  const save = () => {
+-    const dataUrl = canvasRef.current.toDataURL('image/png');
+-    onSave(dataUrl);
+-  };
+-
+-  return (
+-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+-        <div className="p-4 bg-blue-700 text-white flex justify-between items-center">
+-          <h3 className="font-bold flex items-center gap-2"><PenTool size={18} /> Vẽ chữ ký số</h3>
+-          <button onClick={onClose} className="hover:bg-blue-600 p-1 rounded"><X size={20}/></button>
+-        </div>
+-        <div className="p-4 bg-slate-100">
+-          <div className="bg-white border-2 border-dashed border-slate-300 rounded-lg h-64 relative touch-none">
+-            <canvas
+-              ref={canvasRef}
+-              className="w-full h-full cursor-crosshair"
+-              onMouseDown={startDrawing}
+-              onMouseMove={draw}
+-              onMouseUp={stopDrawing}
+-              onMouseOut={stopDrawing}
+-              onTouchStart={startDrawing}
+-              onTouchMove={draw}
+-              onTouchEnd={stopDrawing}
+-            />
+-            <div className="absolute bottom-2 right-2 text-xs text-slate-400 pointer-events-none">Ký vào khung này</div>
+-          </div>
+-        </div>
+-        <div className="p-4 border-t flex justify-between items-center bg-slate-50">
+-          <button onClick={clear} className="text-slate-500 hover:text-red-500 font-medium text-sm transition-colors">Xóa ký lại</button>
+-          <div className="flex gap-2">
+-            <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium transition-colors">Hủy</button>
+-            <button onClick={save} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-colors">Lưu chữ ký</button>
+-          </div>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- QR CAMERA SCANNER COMPONENT ---
+-function QRCameraScanner({ onScan, onClose }) {
+-  const [scriptLoaded, setScriptLoaded] = useState(false);
+-
+-  useEffect(() => {
+-    if (!window.Html5QrcodeScanner) {
+-      const script = document.createElement('script');
+-      script.src = 'https://unpkg.com/html5-qrcode';
+-      script.async = true;
+-      script.onload = () => setScriptLoaded(true);
+-      document.body.appendChild(script);
+-    } else {
+-      setScriptLoaded(true);
+-    }
+-  }, []);
+-
+-  useEffect(() => {
+-    if (scriptLoaded) {
+-      const scanner = new window.Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+-      scanner.render((text) => {
+-        scanner.clear();
+-        onScan(text);
+-      }, (err) => { /* ignore */ });
+-
+-      return () => {
+-        scanner.clear().catch(e => console.error(e));
+-      };
+-    }
+-  }, [scriptLoaded, onScan]);
+-
+-  return (
+-    <div className="fixed inset-0 bg-black/90 z-[80] flex flex-col items-center justify-center p-4">
+-      <div className="w-[95vw] max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl relative">
+-        <div className="flex justify-between items-center p-4 bg-blue-700 text-white">
+-          <h3 className="font-bold flex items-center gap-2"><QrCode size={18} /> Quét QR Phiếu</h3>
+-          <button onClick={onClose} className="p-1 hover:bg-blue-600 rounded"><X size={20}/></button>
+-        </div>
+-        <div className="p-4 bg-slate-100">
+-          {!scriptLoaded ? (
+-            <div className="text-center p-8 text-slate-500">Đang tải Camera...</div>
+-          ) : (
+-            <div id="qr-reader" className="w-full"></div>
+-          )}
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- STANDARD CAMERA COMPONENT ---
+-function CameraCapture({ onCapture, onClose }) {
+-  const videoRef = useRef(null);
+-  const canvasRef = useRef(null);
+-  const [stream, setStream] = useState(null);
+-  const [error, setError] = useState('');
+-
+-  useEffect(() => {
+-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+-      .then(mediaStream => {
+-        setStream(mediaStream);
+-        if (videoRef.current) videoRef.current.srcObject = mediaStream;
+-      })
+-      .catch(err => {
+-        setError('Không thể truy cập Camera. Vui lòng cấp quyền.');
+-      });
+-
+-    return () => {
+-      if (stream) stream.getTracks().forEach(track => track.stop());
+-    };
+-  }, []); 
+-
+-  const handleTakePhoto = () => {
+-    if (!videoRef.current || !canvasRef.current) return;
+-    const video = videoRef.current;
+-    const canvas = canvasRef.current;
+-    canvas.width = video.videoWidth;
+-    canvas.height = video.videoHeight;
+-    const context = canvas.getContext('2d');
+-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+-    onCapture(imageData);
+-  };
+-
+-  return (
+-    <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col items-center justify-center p-4">
+-      <div className="w-[95vw] max-w-lg bg-slate-900 rounded-2xl overflow-hidden shadow-2xl relative border border-slate-700">
+-        <div className="flex justify-between items-center p-4 bg-slate-800 text-white">
+-          <h3 className="font-bold flex items-center gap-2"><Camera size={18} /> Chụp ảnh minh chứng</h3>
+-          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded"><X size={20}/></button>
+-        </div>
+-        <div className="relative bg-black aspect-video flex items-center justify-center">
+-          {error ? (
+-            <div className="text-red-400 p-4 text-center text-sm">{error}</div>
+-          ) : (
+-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+-          )}
+-          <canvas ref={canvasRef} className="hidden" />
+-        </div>
+-        <div className="p-4 bg-slate-800 flex justify-center">
+-          <button onClick={handleTakePhoto} disabled={!!error} className="h-16 w-16 bg-white rounded-full border-4 border-slate-400 hover:scale-105 transition-transform disabled:opacity-50 shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- MAIN APP COMPONENT ---
+-export default function App() {
+-  const [usersData, setUsersData] = useState(() => {
+-    const saved = localStorage.getItem('qlmt_usersData');
+-    return saved ? JSON.parse(saved) : INITIAL_USERS;
+-  });
+-  
+-  const [user, setUser] = useState(() => {
+-    const saved = localStorage.getItem('qlmt_user');
+-    return saved ? JSON.parse(saved) : null;
+-  });
+-
+-  const [activeTab, setActiveTab] = useState('BORROW'); 
+-  const [medicines] = useState(MOCK_MEDICINES);
+-  const [cart, setCart] = useState([]);
+-  
+-  const [records, setRecords] = useState(() => {
+-    const saved = localStorage.getItem('qlmt_records');
+-    return saved ? JSON.parse(saved) : INITIAL_RECORDS;
+-  });
+-  
+-  const [logs, setLogs] = useState([]);
+-  const [toast, setToast] = useState(null);
+-  const toastTimeoutRef = useRef(null);
+-  
+-  const [viewRecordId, setViewRecordId] = useState(null);
+-  const [initialPrintId, setInitialPrintId] = useState(null);
+-  const [hasWarnedLogin, setHasWarnedLogin] = useState(false);
+-  const [confirmGlobalAction, setConfirmGlobalAction] = useState(null); 
+-
+-  useEffect(() => {
+-    localStorage.setItem('qlmt_records', JSON.stringify(records));
+-  }, [records]);
+-
+-  useEffect(() => {
+-    localStorage.setItem('qlmt_usersData', JSON.stringify(usersData));
+-  }, [usersData]);
+-
+-  const showToast = useCallback((message, type = 'success', duration = 3000) => {
+-    setToast({ message, type });
+-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+-    toastTimeoutRef.current = setTimeout(() => setToast(null), duration);
+-  }, []);
+-
+-  const addLog = useCallback((action, details, recordId = null) => {
+-    const newLog = {
+-      id: Date.now().toString(),
+-      time: new Date(),
+-      user: user.name,
+-      department: user.departmentName,
+-      action,
+-      details,
+-      recordId
+-    };
+-    setLogs(prev => [newLog, ...prev]);
+-  }, [user]);
+-
+-  const handleLoginSuccess = (userData) => {
+-    const freshUserData = usersData.find(u => u.username === userData.username);
+-    const fullUser = { ...userData, ...freshUserData };
+-    setUser(fullUser);
+-    localStorage.setItem('qlmt_user', JSON.stringify(fullUser));
+-  };
+-
+-  const handleLogout = () => {
+-    setUser(null);
+-    setCart([]);
+-    setActiveTab('BORROW');
+-    setHasWarnedLogin(false); 
+-    localStorage.removeItem('qlmt_user');
+-  };
+-
+-  const handleViewRecordFromLogs = (id) => {
+-    setActiveTab('LEDGER');
+-    setViewRecordId(id);
+-  };
+-
+-  const handleResetData = () => {
+-    setConfirmGlobalAction({
+-      message: 'Bạn có chắc chắn muốn xóa toàn bộ phiếu mượn và lịch sử hiện tại để làm lại từ đầu?',
+-      action: () => {
+-        setRecords([]);
+-        setLogs([]);
+-        setCart([]);
+-        localStorage.removeItem('qlmt_records');
+-        showToast('Đã khởi tạo lại dữ liệu test ban đầu!');
+-        setConfirmGlobalAction(null);
+-      }
+-    });
+-  };
+-
+-  const updateUserSession = (updatedUserInfo) => {
+-    const updated = { ...user, ...updatedUserInfo };
+-    setUser(updated);
+-    localStorage.setItem('qlmt_user', JSON.stringify(updated));
+-  };
+-
+-  useEffect(() => {
+-    if (user && !hasWarnedLogin && records.length > 0) {
+-      const isDược = user.role === 'DUOC' || user.permissions?.includes('APPROVE');
+-      
+-      const overdueRecords = records.filter(r => {
+-        if (r.status === 'COMPLETED' || r.status === 'CANCELED' || r.status === 'PENDING') return false;
+-        if (!isDược && r.department !== user.departmentName) return false;
+-        const daysOverdue = Math.floor((Date.now() - new Date(r.createdAt)) / (1000 * 60 * 60 * 24));
+-        return daysOverdue > 2; 
+-      });
+-
+-      if (overdueRecords.length > 0) {
+-        const grouped = overdueRecords.reduce((acc, r) => {
+-           const days = Math.floor((Date.now() - new Date(r.createdAt)) / 86400000);
+-           if(!acc[r.department]) acc[r.department] = [];
+-           acc[r.department].push(days);
+-           return acc;
+-        }, {});
+-        
+-        let msg = '⚠ DANH SÁCH PHIẾU QUÁ HẠN:\n';
+-        for(const [dept, daysArr] of Object.entries(grouped)) {
+-           msg += `- ${dept}: ${daysArr.length} phiếu (quá hạn ${Math.max(...daysArr)} ngày)\n`;
++<!doctype html>
++<html lang="vi">
++  <head>
++    <meta charset="UTF-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <title>Quản lý mượn/trả thuốc & VTYT</title>
++    <script src="https://cdn.tailwindcss.com"></script>
++    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
++    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
++    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
++    <style>
++      @media print {
++        .no-print { display: none !important; }
++        body { background: white !important; }
++      }
++    </style>
++  </head>
++  <body class="bg-blue-50 min-h-screen">
++    <div id="root"></div>
++
++    <script>
++      async function bootApp() {
++        try {
++          const res = await fetch('./App.jsx', { cache: 'no-store' });
++          if (!res.ok) throw new Error('Không tải được App.jsx');
++
++          const source = await res.text();
++          const compiled = Babel.transform(source, {
++            presets: ['react'],
++            sourceType: 'script',
++          }).code;
++
++          new Function(compiled)();
++        } catch (error) {
++          console.error(error);
++          document.getElementById('root').innerHTML = `
++            <div style="max-width:760px;margin:32px auto;background:#fff;border:1px solid #fecaca;padding:16px;border-radius:12px;color:#991b1b;font-family:Arial">
++              <h2 style="margin:0 0 8px 0;">Không thể khởi chạy ứng dụng</h2>
++              <p style="margin:0;">Hãy mở đúng <b>index.html</b> (không mở trực tiếp App.jsx) và dùng static server (vd: <code>python -m http.server 8080</code>).</p>
++            </div>
++          `;
+         }
+-        showToast(msg, 'error', 7000);
+       }
+-      setHasWarnedLogin(true);
+-    }
+-  }, [user, hasWarnedLogin, records, showToast]);
+-
+-  if (!user) {
+-    return <LoginScreen onLogin={handleLoginSuccess} usersData={usersData} />;
+-  }
+-
+-  const isDược = user.role === 'DUOC' || user.permissions?.includes('APPROVE');
+-  const hasBorrowPerm = user.permissions?.includes('BORROW');
+-
+-  return (
+-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+-      {toast && (
+-        <div className={`fixed top-4 right-4 z-[99] px-4 py-3 rounded shadow-lg flex items-start gap-2 text-white transition-all w-[90vw] max-w-sm sm:w-auto ${toast.type === 'error' ? 'bg-red-600 animate-bounce shadow-red-500/50' : 'bg-emerald-500'}`}>
+-          {toast.type === 'error' ? <AlertCircle size={20} className="mt-0.5 shrink-0" /> : <CheckCircle size={20} className="mt-0.5 shrink-0" />}
+-          <span className="font-medium whitespace-pre-line leading-relaxed text-sm">{toast.message}</span>
+-        </div>
+-      )}
+-
+-      <header className="bg-blue-700 text-white shadow-md z-10 relative">
+-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+-          <div className="flex items-center gap-3">
+-            <img src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo" className="h-10 w-10 bg-white rounded-full p-1" />
+-            <div>
+-              <h1 className="font-bold text-lg leading-tight">KHOA DƯỢC</h1>
+-              <p className="text-xs text-blue-200">Hệ thống Quản lý Mượn Thuốc</p>
+-            </div>
+-          </div>
+-          <div className="flex items-center gap-4">
+-            <div className="text-right hidden sm:block">
+-              <p className="text-sm font-semibold">{user.name}</p>
+-              <p className="text-xs text-blue-200">{user.departmentName}</p>
+-            </div>
+-            <button onClick={handleLogout} className="p-2 hover:bg-blue-600 rounded-full transition-colors" title="Đăng xuất">
+-              <LogOut size={20} />
+-            </button>
+-          </div>
+-        </div>
+-      </header>
+-
+-      <div className="bg-white border-b sticky top-0 z-0 shadow-sm">
+-        <div className="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto hide-scrollbar">
+-          {hasBorrowPerm && (
+-            <NavButton active={activeTab === 'BORROW'} onClick={() => setActiveTab('BORROW')} icon={<ShoppingCart size={18} />} label="Tạo phiếu mượn" />
+-          )}
+-          <NavButton active={activeTab === 'LEDGER'} onClick={() => setActiveTab('LEDGER')} icon={<FileText size={18} />} label="Sổ quản lý mượn" />
+-          {isDược && (
+-            <NavButton active={activeTab === 'LOGS'} onClick={() => setActiveTab('LOGS')} icon={<History size={18} />} label="Nhật ký hệ thống" />
+-          )}
+-          <NavButton active={activeTab === 'SETTINGS'} onClick={() => setActiveTab('SETTINGS')} icon={<Settings size={18} />} label="Cài đặt hệ thống" />
+-        </div>
+-      </div>
+-
+-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6">
+-        {activeTab === 'BORROW' && hasBorrowPerm && (
+-          <BorrowManager 
+-            user={user} 
+-            departments={DEPARTMENTS}
+-            medicines={medicines} 
+-            cart={cart} 
+-            setCart={setCart} 
+-            onCheckout={(record, shouldPrint) => {
+-              setRecords(prev => [record, ...prev]);
+-              addLog('TẠO PHIẾU', `Tạo phiếu mượn mã ${record.id} (Chờ duyệt)`, record.id);
+-              showToast('Đã tạo phiếu. Vui lòng chờ Khoa Dược duyệt!');
+-              setActiveTab('LEDGER');
+-              if (shouldPrint) {
+-                setInitialPrintId(record.id);
+-              }
+-            }}
+-          />
+-        )}
+-        {activeTab === 'LEDGER' && (
+-          <LedgerManager 
+-            user={user} 
+-            usersData={usersData}
+-            records={records} 
+-            setRecords={setRecords}
+-            addLog={addLog}
+-            showToast={showToast}
+-            externalOpenId={viewRecordId}
+-            clearExternalOpenId={() => setViewRecordId(null)}
+-            initialPrintId={initialPrintId}
+-            clearInitialPrintId={() => setInitialPrintId(null)}
+-          />
+-        )}
+-        {activeTab === 'LOGS' && isDược && <LogsViewer logs={logs} onViewRecord={handleViewRecordFromLogs} />}
+-        {activeTab === 'SETTINGS' && (
+-          <SettingsManager 
+-            user={user}
+-            updateUserSession={updateUserSession}
+-            usersData={usersData}
+-            setUsersData={setUsersData}
+-            onResetData={handleResetData} 
+-            showToast={showToast}
+-          />
+-        )}
+-      </main>
+-
+-      {confirmGlobalAction && (
+-        <ConfirmDialog 
+-          message={confirmGlobalAction.message} 
+-          onConfirm={confirmGlobalAction.action} 
+-          onCancel={() => setConfirmGlobalAction(null)} 
+-        />
+-      )}
+-
+-      <style>{`
+-        /* Chuẩn hóa font in ấn thành Times New Roman 100% */
+-        @media print {
+-          body * { visibility: hidden !important; }
+-          #print-area, #print-area * { 
+-            visibility: visible !important; 
+-            font-family: "Times New Roman", Times, serif !important; 
+-          }
+-          #print-area { 
+-            position: absolute; 
+-            left: 0; top: 0; 
+-            width: 100vw !important; 
+-            min-height: 100vh !important;
+-            padding: 0; margin: 0; 
+-            background: white;
+-          }
+-          @page { size: auto; margin: 10mm; } 
+-        }
+-        .hide-scrollbar::-webkit-scrollbar { display: none; }
+-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+-      `}</style>
+-    </div>
+-  );
+-}
+-
+-// --- LOGIN COMPONENT ---
+-function LoginScreen({ onLogin, usersData }) {
+-  const [username, setUsername] = useState('');
+-  const [password, setPassword] = useState('');
+-  const [error, setError] = useState('');
+-
+-  const handleLogin = (e) => {
+-    e.preventDefault();
+-    setError('');
+-    
+-    const foundUser = usersData.find(u => u.username === username && u.password === password);
+-    if (!foundUser) {
+-      setError('Sai tài khoản hoặc mật khẩu!');
+-      return;
+-    }
+-    const dept = DEPARTMENTS.find(d => d.id === foundUser.departmentId);
+-    onLogin({
+-      id: Date.now().toString(),
+-      username: foundUser.username,
+-      name: foundUser.name,
+-      phone: foundUser.phone,
+-      email: foundUser.email,
+-      departmentId: dept.id,
+-      departmentName: dept.name,
+-      role: dept.role,
+-      permissions: foundUser.permissions || [],
+-      signature: foundUser.signature,
+-      signatureStatus: foundUser.signatureStatus || 'NONE'
+-    });
+-  };
+-
+-  return (
+-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
+-        <div className="text-center mb-8">
+-          <img src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo" className="h-20 mx-auto mb-4" />
+-          <h1 className="text-2xl font-bold text-slate-800">Quản Lý Mượn Thuốc</h1>
+-          <p className="text-slate-500 text-sm">Đăng nhập vào hệ thống</p>
+-        </div>
+-        {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center font-medium">{error}</div>}
+-        <form onSubmit={handleLogin} className="space-y-4">
+-          <div>
+-            <label className="block text-sm font-medium text-slate-700 mb-1">Tên đăng nhập</label>
+-            <input required type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="VD: capcuu" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+-          </div>
+-          <div>
+-            <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
+-            <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="***" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+-          </div>
+-          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4">Vào hệ thống</button>
+-        </form>
+-        <div className="mt-4 text-xs text-slate-400 text-center">Tài khoản: duoc/123, capcuu/123, hoisuc/123...</div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- BORROW MANAGER (KHOA LÂM SÀNG & DƯỢC TẠO PHIẾU) ---
+-function BorrowManager({ user, departments, medicines, cart, setCart, onCheckout }) {
+-  const [searchTerm, setSearchTerm] = useState('');
+-  const [borrowerName, setBorrowerName] = useState(user.name);
+-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+-  
+-  const isDược = user.role === 'DUOC' || user.permissions?.includes('APPROVE');
+-  const [selectedDeptId, setSelectedDeptId] = useState(() => {
+-    if (isDược) {
+-      const firstKhoa = departments.find(d => d.role === 'KHOA');
+-      return firstKhoa ? firstKhoa.id : user.departmentId;
+-    }
+-    return user.departmentId;
+-  });
+-
+-  const isNameEdited = borrowerName.trim() !== user.name.trim();
+-
+-  const filteredMeds = searchTerm.trim().length >= 1 
+-    ? medicines.filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.id.toLowerCase().includes(searchTerm.toLowerCase()))
+-    : medicines;
+-
+-  const addToCart = (med) => {
+-    if (cart.find(item => item.id === med.id)) return; 
+-    setCart([...cart, { ...med, borrowQty: 1 }]);
+-  };
+-
+-  const updateCartQty = (id, qty) => {
+-    const val = parseInt(qty);
+-    if (isNaN(val) || val < 1) return;
+-    setCart(cart.map(item => item.id === id ? { ...item, borrowQty: val } : item));
+-  };
+-
+-  const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
+-
+-  const handleReviewCheckout = () => {
+-    if (cart.length === 0 || !borrowerName.trim()) return;
+-    setShowConfirmModal(true);
+-  };
+-
+-  const confirmCheckout = (finalItems, shouldPrint) => {
+-    const targetDept = departments.find(d => d.id === selectedDeptId) || { name: user.departmentName };
+-    
+-    // Gán chữ ký người mượn nếu chưa đổi tên và đã được duyệt chữ ký
+-    const bSig = (!isNameEdited && user.signatureStatus === 'APPROVED') ? user.signature : null;
+-
+-    const newRecord = {
+-      id: `PM${new Date().getTime().toString().slice(-6)}`,
+-      department: targetDept.name,
+-      borrowerName: borrowerName,
+-      borrowerPhone: user.phone || '',
+-      originalBorrowerName: user.username,
+-      borrowerSignature: bSig,
+-      isNameEdited: isNameEdited,
+-      createdAt: new Date(),
+-      items: finalItems.map(item => ({ ...item, returnedQty: 0 })),
+-      status: 'PENDING', 
+-      returnEvents: [], 
+-      evidenceImages: [] 
+-    };
+-
+-    onCheckout(newRecord, shouldPrint);
+-    setCart([]);
+-    setBorrowerName(user.name); 
+-    setShowConfirmModal(false);
+-  };
+-
+-  return (
+-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-4">
+-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Search size={20} /> Tìm kiếm Thuốc & VTYT</h2>
+-        <div className="relative mb-4">
+-          <input 
+-            type="text" 
+-            placeholder="Gõ tên thuốc, vật tư hoặc mã (từ 1 ký tự)..." 
+-            value={searchTerm}
+-            onChange={(e) => setSearchTerm(e.target.value)}
+-            className="w-full p-3 pl-10 border rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+-          />
+-          <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
+-        </div>
+-        
+-        <div className={`overflow-x-auto border rounded-lg transition-all ${searchTerm.length === 0 ? 'max-h-[175px]' : 'max-h-[500px]'}`}>
+-          <table className="w-full text-left text-sm whitespace-nowrap">
+-            <thead className="bg-slate-50 sticky top-0 shadow-sm z-10">
+-              <tr>
+-                <th className="p-3 font-semibold">Mã</th>
+-                <th className="p-3 font-semibold">Tên Thuốc / VTYT</th>
+-                <th className="p-3 font-semibold text-center">Nguồn</th>
+-                <th className="p-3 font-semibold text-center">ĐVT</th>
+-                <th className="p-3 font-semibold text-right">Thao tác</th>
+-              </tr>
+-            </thead>
+-            <tbody>
+-              {filteredMeds.map(med => {
+-                const inCart = cart.some(item => item.id === med.id);
+-                return (
+-                  <tr key={med.id} className="border-t hover:bg-slate-50 transition-colors">
+-                    <td className="p-3 text-slate-500 font-mono text-xs">{med.id}</td>
+-                    <td className="p-3">
+-                      <span className="font-bold">{med.name}</span>
+-                      {med.activeIngredient && <span className="ml-1 text-slate-600">({med.activeIngredient})</span>}
+-                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border">{med.type === 'THUOC' ? 'Thuốc' : 'VTYT'}</span>
+-                    </td>
+-                    <td className="p-3 text-center">
+-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(med.category)}`}>{med.category}</span>
+-                    </td>
+-                    <td className="p-3 text-center">{med.unit}</td>
+-                    <td className="p-3 text-right">
+-                      <button 
+-                        onClick={() => addToCart(med)}
+-                        disabled={inCart}
+-                        className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 ml-auto transition-colors ${inCart ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+-                      >
+-                        {inCart ? <CheckCircle size={16} /> : <Plus size={16} />}
+-                        {inCart ? 'Đã chọn' : 'Chọn mượn'}
+-                      </button>
+-                    </td>
+-                  </tr>
+-                );
+-              })}
+-              {filteredMeds.length === 0 && (
+-                <tr><td colSpan="5" className="p-8 text-center text-slate-500">Không tìm thấy kết quả phù hợp.</td></tr>
+-              )}
+-            </tbody>
+-          </table>
+-        </div>
+-        {searchTerm.length === 0 && <div className="text-xs text-center text-slate-400 mt-2 italic">* Gõ từ khóa để tìm nhanh, hoặc cuộn danh sách trên.</div>}
+-      </div>
+-
+-      <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col h-full">
+-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-blue-700"><ShoppingCart size={20} /> Giỏ mượn</h2>
+-        <div className="flex-1 overflow-y-auto mb-4 border rounded-lg bg-slate-50">
+-          {cart.length === 0 ? (
+-            <div className="p-8 text-center text-slate-400 flex flex-col items-center">
+-              <ShoppingCart size={40} className="mb-2 opacity-20" />
+-              <p>Chưa chọn mặt hàng nào</p>
+-            </div>
+-          ) : (
+-            <ul className="divide-y">
+-              {cart.map(item => (
+-                <li key={item.id} className="p-3 bg-white">
+-                  <div className="flex justify-between items-start mb-2">
+-                    <span className="text-sm flex flex-wrap items-center gap-1">
+-                      <span className="text-xs font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{item.id}</span>
+-                      <span className="font-bold">{item.name}</span>
+-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(item.category)}`}>{item.category}</span>
+-                    </span>
+-                    <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-600 p-1 shrink-0"><Trash2 size={16} /></button>
+-                  </div>
+-                  <div className="flex items-center justify-between text-sm mt-2">
+-                    <span className="text-slate-500">SL mượn ({item.unit}):</span>
+-                    <input type="number" min="1" value={item.borrowQty} onChange={(e) => updateCartQty(item.id, e.target.value)} className="w-20 p-1 border rounded text-right outline-none focus:border-blue-500 font-bold" />
+-                  </div>
+-                </li>
+-              ))}
+-            </ul>
+-          )}
+-        </div>
+-
+-        <div className="border-t pt-4 space-y-4">
+-          {isDược && (
+-            <div>
+-              <label className="block text-sm font-medium text-slate-700 mb-1">Tạo phiếu cho khoa <span className="text-red-500">*</span></label>
+-              <select value={selectedDeptId} onChange={(e) => setSelectedDeptId(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none bg-white">
+-                {departments.filter(d => d.role === 'KHOA').map(d => (
+-                  <option key={d.id} value={d.id}>{d.name}</option>
+-                ))}
+-              </select>
+-            </div>
+-          )}
+-
+-          <div>
+-            <label className="block text-sm font-medium text-slate-700 mb-1">Người nhận thuốc (Mặc định là bạn)</label>
+-            <input 
+-              type="text" 
+-              value={borrowerName}
+-              onChange={(e) => setBorrowerName(e.target.value)}
+-              className={`w-full p-2 border rounded-lg outline-none transition-colors ${isNameEdited ? 'border-red-300 text-red-600 bg-red-50 focus:border-red-500' : 'border-slate-300 focus:border-blue-500'}`}
+-            />
+-            {isNameEdited && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12} /> Tên thay đổi, chữ ký số tự động sẽ bị vô hiệu hóa.</p>}
+-          </div>
+-          
+-          <button 
+-            onClick={handleReviewCheckout}
+-            disabled={cart.length === 0 || !borrowerName.trim()}
+-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+-          >
+-            <CheckCircle size={20} /> Xem lại & Gửi duyệt {cart.length > 0 && `(${cart.length})`}
+-          </button>
+-        </div>
+-      </div>
+-
+-      {showConfirmModal && (
+-        <ConfirmBorrowModal 
+-          items={cart}
+-          borrowerName={borrowerName}
+-          departmentName={departments.find(d => d.id === selectedDeptId)?.name || user.departmentName}
+-          onClose={() => setShowConfirmModal(false)}
+-          onConfirm={confirmCheckout}
+-        />
+-      )}
+-    </div>
+-  );
+-}
+-
+-function ConfirmBorrowModal({ items, borrowerName, departmentName, onClose, onConfirm }) {
+-  const [editItems, setEditItems] = useState([...items]);
+-
+-  const handleQtyChange = (id, newQty) => {
+-    let val = parseInt(newQty);
+-    if (isNaN(val) || val < 1) val = 1;
+-    setEditItems(editItems.map(item => item.id === id ? { ...item, borrowQty: val } : item));
+-  };
+-
+-  const handleRemove = (id) => {
+-    setEditItems(editItems.filter(item => item.id !== id));
+-  };
+-
+-  return (
+-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+-      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+-        <div className="bg-blue-700 text-white p-4 flex justify-between items-center">
+-          <h3 className="font-bold text-lg flex items-center gap-2"><ShoppingCart size={20} /> Xác nhận phiếu mượn</h3>
+-          <button onClick={onClose} className="text-blue-200 hover:text-white"><X size={20}/></button>
+-        </div>
+-        
+-        <div className="p-4 bg-slate-50 border-b flex flex-wrap gap-4 text-sm">
+-          <div><span className="text-slate-500">Khoa mượn:</span> <strong>{departmentName}</strong></div>
+-          <div><span className="text-slate-500">Người nhận:</span> <strong>{borrowerName}</strong></div>
+-        </div>
+-
+-        <div className="p-4 flex-1 overflow-x-auto">
+-          {editItems.length === 0 ? (
+-            <p className="text-center text-slate-500 py-8">Giỏ mượn đang trống.</p>
+-          ) : (
+-            <div className="min-w-[600px]">
+-              <table className="w-full text-left text-sm border-collapse">
+-                <thead>
+-                  <tr className="bg-slate-100">
+-                    <th className="p-2 border text-center w-10">STT</th>
+-                    <th className="p-2 border">Tên Thuốc / VTYT</th>
+-                    <th className="p-2 border text-center w-20">Nguồn</th>
+-                    <th className="p-2 border text-center w-20">ĐVT</th>
+-                    <th className="p-2 border text-center w-32 bg-blue-50 text-blue-800">SL Mượn</th>
+-                    <th className="p-2 border text-center w-16">Xóa</th>
+-                  </tr>
+-                </thead>
+-                <tbody>
+-                  {editItems.map((item, index) => (
+-                    <tr key={item.id}>
+-                      <td className="p-2 border text-center text-slate-500">{index + 1}</td>
+-                      <td className="p-2 border"><span className="font-bold">{item.name}</span></td>
+-                      <td className="p-2 border text-center"><span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(item.category)}`}>{item.category}</span></td>
+-                      <td className="p-2 border text-center">{item.unit}</td>
+-                      <td className="p-2 border text-center bg-blue-50">
+-                        <input type="number" min="1" value={item.borrowQty} onChange={(e) => handleQtyChange(item.id, e.target.value)} className="w-full p-2 text-center border border-blue-300 rounded font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+-                      </td>
+-                      <td className="p-2 border text-center">
+-                        <button onClick={() => handleRemove(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"><Trash2 size={16} /></button>
+-                      </td>
+-                    </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-            </div>
+-          )}
+-        </div>
+-
+-        <div className="p-4 border-t bg-slate-50 flex justify-end items-center gap-3 flex-wrap">
+-          <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded font-medium">Quay lại sửa</button>
+-          <button onClick={() => onConfirm(editItems, false)} disabled={editItems.length === 0} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold flex items-center gap-2"><CheckCircle size={18} /> Gửi duyệt</button>
+-          <button onClick={() => onConfirm(editItems, true)} disabled={editItems.length === 0} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold flex items-center gap-2"><Printer size={18} /> Gửi duyệt & In phiếu</button>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- LEDGER MANAGER (SỔ MƯỢN) ---
+-function LedgerManager({ user, usersData, records, setRecords, addLog, showToast, externalOpenId, clearExternalOpenId, initialPrintId, clearInitialPrintId }) {
+-  const [printRecord, setPrintRecord] = useState(null);
+-  const [showPrintModal, setShowPrintModal] = useState(false);
+-  const [returnRecord, setReturnRecord] = useState(null);
+-  const [approveRecord, setApproveRecord] = useState(null);
+-  const [confirmAction, setConfirmAction] = useState(null); 
+-  
+-  const [qrScannerInput, setQrScannerInput] = useState('');
+-  const [showCameraScanner, setShowCameraScanner] = useState(false);
+-  const qrInputRef = useRef(null);
+-
+-  const isDược = user.role === 'DUOC' || user.permissions.includes('APPROVE');
+-
+-  const [, setTick] = useState(0);
+-  useEffect(() => {
+-    const timer = setInterval(() => setTick(t => t + 1), 10000);
+-    return () => clearInterval(timer);
+-  }, []);
+-
+-  useEffect(() => {
+-    if (qrInputRef.current) qrInputRef.current.focus();
+-  }, [records]); 
+-
+-  const executeScan = useCallback((codeToScan) => {
+-    const code = codeToScan.trim();
+-    if (!code) return;
+-    const record = records.find(r => r.id === code);
+-    if (record) {
+-      if (!isDược && record.department !== user.departmentName) {
+-         showToast('Bạn không có quyền truy cập phiếu của Khoa khác!', 'error');
+-         return;
+-      }
+-      if (record.status === 'PENDING') {
+-        if (isDược) setApproveRecord(record); 
+-        else showToast('Phiếu này đang chờ Khoa Dược duyệt, bạn chưa thể thao tác!', 'error');
+-      } else {
+-        setReturnRecord(record); 
+-      }
+-    } else {
+-      showToast('Không tìm thấy mã phiếu hợp lệ!', 'error');
+-    }
+-    setQrScannerInput(''); 
+-  }, [records, isDược, user.departmentName, showToast]);
+-
+-  const handleScanQR = (e) => {
+-    e.preventDefault();
+-    executeScan(qrScannerInput);
+-  };
+-
+-  useEffect(() => {
+-    if (externalOpenId) {
+-      const rec = records.find(r => r.id === externalOpenId);
+-      if (rec) {
+-        if (rec.status === 'PENDING') {
+-           if (isDược) setApproveRecord(rec);
+-           else showToast('Phiếu chờ duyệt, bạn chưa có quyền thao tác!', 'error');
+-        } else {
+-           setReturnRecord(rec);
+-        }
+-      }
+-      clearExternalOpenId();
+-    }
+-  }, [externalOpenId, records, clearExternalOpenId, isDược, showToast]);
+-
+-  useEffect(() => {
+-    if (initialPrintId) {
+-      const rec = records.find(r => r.id === initialPrintId);
+-      if (rec) {
+-        setPrintRecord(rec);
+-        setShowPrintModal(true);
+-      }
+-      clearInitialPrintId();
+-    }
+-  }, [initialPrintId, records, clearInitialPrintId]);
+-
+-  const visibleRecords = isDược ? records : records.filter(r => r.department === user.departmentName);
+-
+-  const searchedRecords = visibleRecords.filter(r => {
+-    if (!qrScannerInput.trim()) return true;
+-    const term = qrScannerInput.trim().toLowerCase();
+-    return r.id.toLowerCase().includes(term) || r.borrowerName.toLowerCase().includes(term) || r.department.toLowerCase().includes(term);
+-  });
+-
+-  const statusWeight = { PENDING: 0, DEBT: 1, BORROWED: 1, COMPLETED: 2, CANCELED: 3 };
+-  const sortedRecords = [...searchedRecords].sort((a, b) => {
+-    if (statusWeight[a.status] !== statusWeight[b.status]) return statusWeight[a.status] - statusWeight[b.status];
+-    return new Date(b.createdAt) - new Date(a.createdAt);
+-  });
+-
+-  const handleRecall = (record) => {
+-    setConfirmAction({
+-      message: 'Bạn có chắc chắn muốn THU HỒI và XÓA phiếu mượn này?',
+-      action: () => {
+-        setRecords(prev => prev.filter(r => r.id !== record.id));
+-        addLog('THU HỒI', `Đã thu hồi/xóa phiếu ${record.id}`, record.id);
+-        showToast('Đã thu hồi và xóa phiếu thành công!');
+-        setConfirmAction(null);
+-      }
+-    });
+-  };
+-
+-  const handleUndo = (record) => {
+-    const actionName = record.undoType === 'RETURN' ? 'TRẢ THUỐC' : 'DUYỆT ĐƠN';
+-    setConfirmAction({
+-      message: `Bạn có chắc chắn muốn hoàn tác thao tác ${actionName} vừa thực hiện?`,
+-      action: () => {
+-        const restoredRecord = record.previousState;
+-        const cleanedRecord = { ...restoredRecord };
+-        delete cleanedRecord.previousState; delete cleanedRecord.lastActionTime; delete cleanedRecord.undoType;
+-        setRecords(prev => prev.map(r => r.id === record.id ? cleanedRecord : r));
+-        addLog('HOÀN TÁC', `Đã hoàn tác thao tác ${actionName} trên phiếu ${record.id}`, record.id);
+-        showToast('Đã hoàn tác thành công!');
+-        setConfirmAction(null);
+-      }
+-    });
+-  };
+-
+-  const processApprove = (updatedRecord) => {
+-    const approvedItems = updatedRecord.items.filter(item => item.borrowQty > 0);
+-    const isCanceled = approvedItems.length === 0;
+-    
+-    const lSig = (user.signatureStatus === 'APPROVED') ? user.signature : null;
+-
+-    const finalRecord = {
+-      ...updatedRecord,
+-      items: approvedItems,
+-      status: isCanceled ? 'CANCELED' : 'BORROWED',
+-      lenderName: user.name,
+-      lenderPhone: user.phone || '',
+-      lenderSignature: lSig,
+-      approvedAt: new Date(),
+-      previousState: records.find(r => r.id === updatedRecord.id),
+-      lastActionTime: Date.now(),
+-      undoType: 'APPROVE'
+-    };
+-
+-    setRecords(prev => prev.map(r => r.id === finalRecord.id ? finalRecord : r));
+-    addLog('DUYỆT ĐƠN', `Khoa Dược đã ${isCanceled ? 'từ chối toàn bộ' : 'duyệt'} đơn mượn mã ${finalRecord.id}`, finalRecord.id);
+-    showToast(isCanceled ? 'Đã hủy phiếu do không duyệt mặt hàng nào!' : 'Đã duyệt đơn mượn thành công!');
+-    setApproveRecord(null);
+-  };
+-
+-  const processReturn = (updatedRecord) => {
+-    const isDebt = updatedRecord.items.some(item => item.returnedQty < item.borrowQty);
+-    const newStatus = isDebt ? 'DEBT' : 'COMPLETED';
+-
+-    const finalRecord = {
+-      ...updatedRecord,
+-      status: newStatus,
+-      returnedAt: new Date(),
+-      returnedBy: user.name,
+-      previousState: records.find(r => r.id === updatedRecord.id),
+-      lastActionTime: Date.now(),
+-      undoType: 'RETURN'
+-    };
+-
+-    setRecords(prev => prev.map(r => r.id === finalRecord.id ? finalRecord : r));
+-    
+-    if (isDebt) {
+-      addLog('DUYỆT TRẢ', `Khoa Dược duyệt trả (CÒN NỢ) phiếu mã ${finalRecord.id}`, finalRecord.id);
+-      showToast('Đã duyệt trả. Phiếu này hiện CÒN NỢ!', 'error');
+-    } else {
+-      addLog('DUYỆT TRẢ', `Khoa Dược duyệt trả hoàn tất phiếu mã ${finalRecord.id}`, finalRecord.id);
+-      showToast('Đã duyệt trả thành công toàn bộ!');
+-    }
+-    setReturnRecord(null);
+-  };
+-
+-  const handleSendNotice = (record, type) => {
+-    const contact = type === 'email' ? (record.borrowerPhone || 'Chưa có Email') : (record.borrowerPhone || 'Chưa có SĐT');
+-    showToast(`Đã mô phỏng gửi ${type.toUpperCase()} đến ${record.borrowerName} (${contact})`);
+-    addLog('GỬI THÔNG BÁO', `Gửi thông báo nhắc nhở ${type.toUpperCase()} cho phiếu ${record.id}`, record.id);
+-  };
+-
+-  return (
+-    <div className="bg-white rounded-xl shadow-sm border p-4 min-h-[500px]">
+-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+-        <h2 className="text-xl font-bold flex items-center gap-2"><FileText size={24} /> Sổ Quản Lý Mượn/Trả</h2>
+-        
+-        <div className="flex flex-col sm:flex-row w-full sm:w-auto relative gap-2">
+-          <form onSubmit={handleScanQR} className="relative w-full sm:w-72">
+-            <input 
+-              ref={qrInputRef}
+-              type="text" 
+-              placeholder="Nhập/Quét mã QR phiếu..." 
+-              value={qrScannerInput}
+-              onChange={(e) => setQrScannerInput(e.target.value)}
+-              className="w-full p-2 pl-10 pr-20 border-2 border-blue-400 rounded-lg outline-none focus:border-blue-600 bg-blue-50 font-mono"
+-            />
+-            <ScanBarcode className="absolute left-3 top-2.5 text-blue-500" size={20} />
+-            <button type="submit" className="absolute right-1 top-1 bottom-1 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors">Tìm</button>
+-          </form>
+-          <button onClick={() => setShowCameraScanner(true)} className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg flex justify-center items-center gap-1 transition-colors whitespace-nowrap" title="Quét QR bằng Camera">
+-            <Camera size={20} /><span className="sm:hidden lg:inline">Quét Camera</span>
+-          </button>
+-        </div>
+-      </div>
+-
+-      <div className="overflow-x-auto">
+-        <table className="w-full text-left text-sm whitespace-nowrap">
+-          <thead className="bg-slate-100 text-slate-700">
+-            <tr>
+-              <th className="p-3 rounded-tl-lg text-center w-12">STT</th>
+-              <th className="p-3">Mã phiếu</th>
+-              <th className="p-3">Khoa mượn</th>
+-              <th className="p-3">Người đi mượn</th>
+-              <th className="p-3">Thời gian tạo</th>
+-              <th className="p-3">Trạng thái</th>
+-              <th className="p-3 text-right rounded-tr-lg">Thao tác</th>
+-            </tr>
+-          </thead>
+-          <tbody className="divide-y">
+-            {sortedRecords.length === 0 ? (
+-              <tr><td colSpan="7" className="p-8 text-center text-slate-500">Chưa có dữ liệu phiếu mượn phù hợp.</td></tr>
+-            ) : (
+-              sortedRecords.map((record, index) => {
+-                const isCompleted = record.status === 'COMPLETED';
+-                const isPending = record.status === 'PENDING';
+-                const isCanceled = record.status === 'CANCELED';
+-                
+-                const timeSinceCreation = Date.now() - new Date(record.createdAt).getTime();
+-                const daysOverdue = Math.floor(timeSinceCreation / (1000 * 60 * 60 * 24));
+-                const showWarning = daysOverdue > 2 && !isCompleted && !isPending && !isCanceled;
+-                
+-                const canUndo = record.previousState && (Date.now() - record.lastActionTime) < 60000;
+-                const isCreator = record.originalBorrowerName === user.username || record.department === user.departmentName;
+-                const canRecall = isPending && isCreator && (!isDược || timeSinceCreation <= 60000);
+-
+-                return (
+-                  <tr key={record.id} className={`transition-all duration-300 ${isCompleted || isCanceled ? 'bg-slate-50 opacity-60 hover:opacity-100' : isPending ? 'bg-purple-50' : showWarning ? 'bg-red-50/30' : 'hover:bg-blue-50'}`}>
+-                    <td className="p-3 text-center font-semibold text-slate-500">{index + 1}</td>
+-                    <td className="p-3 font-mono font-medium text-blue-700">{record.id}</td>
+-                    <td className="p-3 font-semibold">{record.department}</td>
+-                    <td className="p-3"><span>{record.borrowerName}</span></td>
+-                    <td className="p-3 text-slate-500">{new Date(record.createdAt).toLocaleString('vi-VN')}</td>
+-                    <td className="p-3">
+-                      <div className="flex flex-col gap-1 items-start">
+-                        {isPending ? (
+-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><Clock size={14} /> Chờ duyệt</span>
+-                        ) : isCompleted ? (
+-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"><CheckCircle size={14} /> Đã trả xong</span>
+-                        ) : isCanceled ? (
+-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-700"><Trash2 size={14} /> Hủy / 0 duyệt</span>
+-                        ) : record.status === 'DEBT' ? (
+-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700"><AlertCircle size={14} /> Còn nợ</span>
+-                        ) : (
+-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><Clock size={14} /> Đang mượn</span>
+-                        )}
+-                        {showWarning && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 animate-pulse mt-1"><AlertTriangle size={12} /> Quá hạn {daysOverdue} ngày!</span>}
+-                      </div>
+-                    </td>
+-                    <td className="p-3 text-right">
+-                      <div className="flex justify-end gap-2 items-center flex-wrap">
+-                        {canUndo && isDược && <button onClick={() => handleUndo(record)} className="px-2 py-1 bg-orange-100 text-orange-600 rounded border border-orange-300 text-xs font-bold flex items-center gap-1"><RotateCcw size={14}/> Hoàn tác</button>}
+-                        {canRecall && <button onClick={() => handleRecall(record)} className="px-2 py-1 bg-red-100 text-red-600 rounded border border-red-300 text-xs font-bold flex items-center gap-1"><Trash2 size={14}/> Thu hồi</button>}
+-                        {showWarning && isDược && <button onClick={() => handleSendNotice(record, 'email')} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded"><Send size={18}/></button>}
+-                        {!isCanceled && <button onClick={() => handlePrint(record)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-100 rounded"><Printer size={18} /></button>}
+-                        {isPending && isDược && <button onClick={() => setApproveRecord(record)} className="px-4 py-1.5 bg-purple-600 text-white rounded text-xs font-bold">Duyệt đơn</button>}
+-                        {!isPending && !isCompleted && !isCanceled && isDược && <button onClick={() => setReturnRecord(record)} className={`px-3 py-1.5 text-white rounded text-xs font-bold ${record.status === 'DEBT' ? 'bg-orange-500' : 'bg-emerald-500'}`}>{record.status === 'DEBT' ? 'Nhận trả thêm' : 'Duyệt trả'}</button>}
+-                        {(!isPending && (isCompleted || isCanceled || !isDược)) || (isPending && !isDược && !canRecall) ? <button onClick={() => setReturnRecord(record)} className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-xs font-medium">Xem chi tiết</button> : null}
+-                      </div>
+-                    </td>
+-                  </tr>
+-                );
+-              })
+-            )}
+-          </tbody>
+-        </table>
+-      </div>
+-
+-      {showCameraScanner && <QRCameraScanner onClose={() => setShowCameraScanner(false)} onScan={(code) => { setShowCameraScanner(false); executeScan(code); }} />}
+-      {approveRecord && <ApproveModal record={approveRecord} onClose={() => setApproveRecord(null)} onConfirm={processApprove} />}
+-      {returnRecord && <ReturnModal user={user} record={returnRecord} onClose={() => setReturnRecord(null)} onConfirm={processReturn} readOnly={returnRecord.status === 'COMPLETED' || returnRecord.status === 'CANCELED' || !isDược || returnRecord.status === 'PENDING'} onSendNotice={(rec, t) => handleSendNotice(rec, t)} />}
+-      {showPrintModal && <PrintModal record={printRecord} onClose={() => setShowPrintModal(false)} showToast={showToast} />}
+-      {confirmAction && <ConfirmDialog message={confirmAction.message} onConfirm={confirmAction.action} onCancel={() => setConfirmAction(null)} />}
+-    </div>
+-  );
+-}
+-
+-// --- APPROVE MODAL ---
+-function ApproveModal({ record, onClose, onConfirm }) {
+-  const [items, setItems] = useState(record.items);
+-  const [evidenceImages, setEvidenceImages] = useState(record.evidenceImages || []);
+-  const [showCamera, setShowCamera] = useState(false);
+-  const [viewingImages, setViewingImages] = useState(null);
+-
+-  const handleQtyChange = (id, newQty) => {
+-    let val = parseInt(newQty);
+-    if (isNaN(val) || val < 0) val = 0; 
+-    setItems(items.map(item => item.id === id ? { ...item, borrowQty: val } : item));
+-  };
+-
+-  const handleRemoveItem = (id) => {
+-    setItems(items.map(item => item.id === id ? { ...item, borrowQty: 0 } : item));
+-  };
+-
+-  const submitApprove = () => onConfirm({ ...record, items, evidenceImages });
+-
+-  return (
+-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+-      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+-        <div className="bg-purple-700 text-white p-4 flex justify-between items-center">
+-          <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle size={20} /> Duyệt đơn mượn thuốc - {record.id}</h3>
+-          <button onClick={onClose} className="text-purple-200 hover:text-white"><X size={20}/></button>
+-        </div>
+-        <div className="p-4 bg-purple-50 border-b flex flex-wrap gap-4 text-sm justify-between items-center">
+-          <div className="flex gap-4 flex-wrap">
+-            <div><span className="text-purple-600/70">Khoa mượn:</span> <strong className="text-purple-900">{record.department}</strong></div>
+-            <div><span className="text-purple-600/70">Người mượn:</span> <strong className="text-purple-900">{record.borrowerName}</strong></div>
+-            <div><span className="text-purple-600/70">Thời gian:</span> <span className="text-purple-900">{new Date(record.createdAt).toLocaleString('vi-VN')}</span></div>
+-          </div>
+-          {evidenceImages.length > 0 && (
+-             <button onClick={() => setViewingImages(evidenceImages)} className="flex items-center gap-1 text-xs px-2 py-1 bg-purple-200 text-purple-800 rounded font-bold shadow-sm">
+-               <ImageIcon size={14}/> Xem ảnh duyệt đơn ({evidenceImages.length})
+-             </button>
+-          )}
+-        </div>
+-        <div className="p-4 flex-1 overflow-x-auto">
+-          <div className="min-w-[700px]">
+-            <table className="w-full text-left text-sm border-collapse">
+-              <thead>
+-                <tr className="bg-slate-100">
+-                  <th className="p-2 border text-center w-10">STT</th>
+-                  <th className="p-2 border text-center w-20">Mã</th>
+-                  <th className="p-2 border">Tên Thuốc / VTYT</th>
+-                  <th className="p-2 border text-center">Nguồn</th>
+-                  <th className="p-2 border text-center">ĐVT</th>
+-                  <th className="p-2 border text-center w-32 bg-purple-100 text-purple-800">SL Duyệt Mượn</th>
+-                  <th className="p-2 border text-center w-16">Xóa</th>
+-                </tr>
+-              </thead>
+-              <tbody>
+-                {items.map((item, index) => (
+-                  <tr key={item.id} className={item.borrowQty === 0 ? 'bg-red-50 opacity-60' : ''}>
+-                    <td className="p-2 border text-center text-slate-500">{index + 1}</td>
+-                    <td className="p-2 border text-center font-mono text-xs">{item.id}</td>
+-                    <td className="p-2 border">
+-                      <span className="font-bold">{item.name}</span>
+-                      {item.activeIngredient && <span className="ml-1 text-slate-600">({item.activeIngredient})</span>}
+-                    </td>
+-                    <td className="p-2 border text-center">
+-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getBadgeStyle(item.category)}`}>{item.category}</span>
+-                    </td>
+-                    <td className="p-2 border text-center">{item.unit}</td>
+-                    <td className="p-2 border text-center bg-purple-50">
+-                      <input type="number" min="0" value={item.borrowQty} onChange={(e) => handleQtyChange(item.id, e.target.value)} className="w-full p-2 text-center border rounded font-bold outline-none focus:ring-2 bg-white" />
+-                    </td>
+-                    <td className="p-2 border text-center">
+-                       <button onClick={() => handleQtyChange(item.id, 0)} className="text-red-500 hover:bg-red-100 p-1.5 rounded"><Trash2 size={18}/></button>
+-                    </td>
+-                  </tr>
+-                ))}
+-              </tbody>
+-            </table>
+-          </div>
+-          <p className="text-xs text-slate-500 mt-3 italic">* Khoa Dược có thể kiểm tra tồn kho và sửa lượng duyệt về 0 (hoặc ấn thùng rác) nếu hết thuốc. Những món = 0 sẽ tự động bị xóa khỏi phiếu.</p>
+-        </div>
+-        <div className="p-4 border-t bg-slate-50 flex justify-between items-center gap-3">
+-          <button onClick={() => setShowCamera(true)} className="p-2 bg-slate-200 text-slate-700 rounded-lg flex items-center gap-2"><Camera size={18} /> Chụp ảnh</button>
+-          <div className="flex gap-3">
+-            <button onClick={onClose} className="px-4 py-2 bg-slate-200 text-slate-800 rounded font-medium">Đóng</button>
+-            <button onClick={submitApprove} className="px-6 py-2 bg-purple-600 text-white rounded font-bold"><CheckCircle size={18} className="inline mr-1" /> Duyệt</button>
+-          </div>
+-        </div>
+-      </div>
+-      {showCamera && <CameraCapture onClose={() => setShowCamera(false)} onCapture={(img) => { setEvidenceImages([...evidenceImages, img]); setShowCamera(false); }} />}
+-      {viewingImages && <ImageViewerModal images={viewingImages} onClose={() => setViewingImages(null)} />}
+-    </div>
+-  );
+-}
+-
+-// --- RETURN MODAL ---
+-function ReturnModal({ user, record, onClose, onConfirm, readOnly, onSendNotice }) {
+-  const [sessionReturns, setSessionReturns] = useState(record.items.map(item => ({ id: item.id, qty: readOnly ? 0 : (item.borrowQty - (item.returnedQty ?? 0)) })));
+-  const [sessionImages, setSessionImages] = useState([]);
+-  const [showCamera, setShowCamera] = useState(false);
+-  const [viewingImages, setViewingImages] = useState(null);
+-
+-  const submitReturn = () => {
+-    const curSession = (record.returnSessions || 0) + 1;
+-    const now = new Date();
+-    const processorSig = (user.signatureStatus === 'APPROVED') ? user.signature : null;
+-    
+-    const updatedItems = record.items.map(item => {
+-      const retQty = sessionReturns.find(s => s.id === item.id)?.qty || 0;
+-      return { 
+-        ...item, 
+-        returnedQty: (item.returnedQty||0) + retQty, 
+-        returnHistory: [...(item.returnHistory||[]), { session: curSession, qty: retQty, date: now, processor: user.name }] 
+-      };
+-    });
+-    
+-    const newEvents = [...(record.returnEvents||[]), { 
+-      session: curSession, date: now, images: sessionImages, processor: user.name, processorSignature: processorSig 
+-    }];
+-
+-    onConfirm({ ...record, items: updatedItems, returnSessions: curSession, returnEvents: newEvents });
+-  };
+-
+-  const totalRet = sessionReturns.reduce((sum, s) => sum + s.qty, 0);
+-
+-  return (
+-    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+-      <div className="bg-white rounded-xl shadow-xl w-[95vw] max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+-        <div className="bg-blue-700 text-white p-4 flex justify-between items-center">
+-          <h3 className="font-bold text-lg flex items-center gap-2">{readOnly ? <Eye size={20}/> : <ShoppingCart size={20}/>} {readOnly ? 'Chi tiết phiếu' : 'Xác nhận trả thuốc'} - {record.id}</h3>
+-          <button onClick={onClose} className="text-blue-200 hover:text-white"><X size={20}/></button>
+-        </div>
+-        <div className="p-4 bg-slate-50 border-b flex flex-wrap gap-4 text-sm justify-between">
+-          <div className="flex gap-4 flex-wrap items-center">
+-            <div><span className="text-slate-500">Khoa mượn:</span> <strong>{record.department}</strong></div>
+-            <div><span className="text-slate-500">Người mượn:</span> <strong>{record.borrowerName}</strong></div>
+-            <div><span className="text-slate-500">Ngày tạo:</span> {new Date(record.createdAt).toLocaleString('vi-VN')}</div>
+-            {record.evidenceImages?.length > 0 && (
+-               <button onClick={() => setViewingImages(record.evidenceImages)} className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200 shadow-sm ml-2">
+-                 <ImageIcon size={14}/> Xem ảnh duyệt đơn
+-               </button>
+-            )}
+-          </div>
+-          {(readOnly || record.status === 'DEBT') && !readOnly && record.status !== 'PENDING' && (
+-            <div className="flex gap-2">
+-              <button onClick={() => onSendNotice(record, 'sms')} className="flex items-center gap-1 text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition border border-green-200"><Smartphone size={14}/> Báo SĐT</button>
+-              <button onClick={() => onSendNotice(record, 'email')} className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition border border-blue-200"><Mail size={14}/> Gửi Email</button>
+-            </div>
+-          )}
+-        </div>
+-        <div className="p-4 flex-1 overflow-x-auto">
+-          <table className="w-full text-left text-sm border-collapse min-w-[850px]">
+-            <thead>
+-              <tr className="bg-slate-100"><th className="p-2 border">Thuốc/VTYT</th><th className="p-2 border text-center">Mượn</th><th className="p-2 border text-center w-[250px]">Chi tiết các lần trả</th><th className="p-2 border text-center">Trả đợt này</th></tr>
+-            </thead>
+-            <tbody>
+-              {record.items.map(item => {
+-                const rem = item.borrowQty - (item.returnedQty||0);
+-                const sQty = sessionReturns.find(s=>s.id===item.id)?.qty||0;
+-                return (
+-                  <tr key={item.id}>
+-                    <td className="p-2 border">
+-                      <span className="font-bold">{item.name}</span>
+-                      {item.activeIngredient && <span className="ml-1 text-slate-600">({item.activeIngredient})</span>}
+-                      <br/><span className="font-mono text-xs text-slate-400 mt-1">{item.id}</span>
+-                    </td>
+-                    <td className="p-2 border text-center font-bold text-blue-700">{item.borrowQty} {item.unit}</td>
+-                    <td className="p-2 border text-xs bg-slate-50">
+-                       <div className="flex justify-between font-bold border-b pb-1 mb-1">
+-                          <span>Đã trả: {(item.returnedQty||0)}/{item.borrowQty}</span>
+-                       </div>
+-                       <div className="flex flex-col gap-1">
+-                          {item.returnHistory?.map((h, i) => {
+-                             const ev = record.returnEvents?.find(e => e.session === h.session);
+-                             return (
+-                             <div key={i} className="bg-white border rounded p-1.5 flex flex-col gap-1 shadow-sm">
+-                               <div className="flex justify-between items-center">
+-                                 <span className="text-slate-700">Lần {h.session}: <strong className="text-slate-900 text-sm">{h.qty}</strong></span>
+-                                 {ev?.images?.length > 0 && (
+-                                   <button onClick={() => setViewingImages(ev.images)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-1 rounded" title="Xem ảnh minh chứng">
+-                                     <ImageIcon size={14}/>
+-                                   </button>
+-                                 )}
+-                               </div>
+-                               <div className="flex justify-between items-end border-t border-dashed pt-1 mt-1">
+-                                 <i className="text-slate-400 text-[9px]">{new Date(h.date).toLocaleString('vi-VN')}</i>
+-                                 {ev?.processorSignature ? (
+-                                   <div className="flex flex-col items-end"><img src={ev.processorSignature} alt="sig" className="h-6 object-contain" /><span className="text-[8px] text-slate-400">{h.processor}</span></div>
+-                                 ) : <span className="text-[9px] text-slate-500">{h.processor}</span>}
+-                               </div>
+-                             </div>
+-                          )})}
+-                       </div>
+-                    </td>
+-                    <td className="p-2 border text-center bg-emerald-50">
+-                      {readOnly || rem === 0 ? <span className="text-slate-400">{rem===0?'(Đủ)':'-'}</span> : (
+-                        <input type="number" min="0" max={rem} value={sQty} onChange={(e) => setSessionReturns(sessionReturns.map(s => s.id === item.id ? { ...s, qty: Math.min(Math.max(0, parseInt(e.target.value)||0), rem) } : s))} className="w-20 p-1 text-center border border-emerald-300 rounded font-bold outline-none focus:ring-2" />
+-                      )}
+-                    </td>
+-                  </tr>
+-                );
+-              })}
+-            </tbody>
+-          </table>
+-          {!readOnly && (
+-             <div className="mt-4 p-4 border border-emerald-200 rounded-lg bg-emerald-50">
+-               <button onClick={() => setShowCamera(true)} className="px-3 py-1.5 bg-white border rounded flex items-center gap-1"><Camera size={14}/> Chụp minh chứng đợt này</button>
+-               {sessionImages.length > 0 && (
+-                 <div className="flex gap-2 mt-2 overflow-x-auto">
+-                   {sessionImages.map((img, i) => (
+-                      <div key={i} className="relative w-16 h-16 shrink-0"><img src={img} className="w-full h-full object-cover rounded border" alt=""/><button onClick={() => setSessionImages(sessionImages.filter((_,idx)=>idx!==i))} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5"><X size={10}/></button></div>
+-                   ))}
+-                 </div>
+-               )}
+-             </div>
+-          )}
+-        </div>
+-        <div className="p-4 border-t bg-slate-50 flex justify-end gap-3">
+-          <button onClick={onClose} className="px-4 py-2 bg-slate-200 rounded font-medium">Đóng</button>
+-          {!readOnly && <button onClick={submitReturn} disabled={totalRet===0} className="px-6 py-2 text-white bg-emerald-600 rounded font-bold">Duyệt hoàn trả</button>}
+-        </div>
+-      </div>
+-      {showCamera && <CameraCapture onClose={() => setShowCamera(false)} onCapture={(img) => { setSessionImages([...sessionImages, img]); setShowCamera(false); }} />}
+-      {viewingImages && <ImageViewerModal images={viewingImages} onClose={() => setViewingImages(null)} />}
+-    </div>
+-  );
+-}
+-
+-// --- PRINT MODAL & PREVIEW ---
+-function PrintModal({ record, onClose, showToast }) {
+-  const [isDownloading, setIsDownloading] = useState(false);
+-
+-  const handleDownloadImage = () => {
+-    const el = document.getElementById('print-area');
+-    if(!el) return;
+-    setIsDownloading(true);
+-    window.html2canvas(el, { 
+-      scale: 2, 
+-      useCORS: true,
+-      backgroundColor: '#ffffff'
+-    }).then(canvas => {
+-      const link = document.createElement('a');
+-      link.download = `Phieu_${record.id}.png`;
+-      link.href = canvas.toDataURL('image/png'); link.click();
+-      setIsDownloading(false);
+-    }).catch(() => {
+-      if(showToast) showToast("Lỗi tạo ảnh", "error");
+-      setIsDownloading(false);
+-    });
+-  };
+-
+-  return (
+-    <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-[60] p-4">
+-      <div className="bg-slate-200 rounded-xl shadow-2xl w-[95vw] max-w-5xl max-h-[95vh] flex flex-col overflow-hidden">
+-        <div className="bg-white p-4 flex justify-between items-center border-b">
+-          <h3 className="font-bold text-lg flex items-center gap-2"><Printer size={20} className="text-blue-600" /> Bản xem trước phiếu in</h3>
+-          <div className="flex gap-2">
+-            <button onClick={onClose} className="px-4 py-2 bg-slate-100 rounded-lg">Đóng</button>
+-            <button onClick={handleDownloadImage} disabled={isDownloading} className="px-4 py-2 bg-emerald-600 text-white rounded-lg flex gap-1"><Download size={18}/> {isDownloading ? 'Đang tải...' : 'Tải ảnh'}</button>
+-            <button onClick={() => window.print()} className="px-6 py-2 bg-blue-600 text-white rounded-lg flex gap-1"><Printer size={18}/> In Phiếu</button>
+-          </div>
+-        </div>
+-        <div className="p-6 overflow-auto flex-1 flex justify-center bg-slate-200">
+-           <div className="bg-white shadow-md print-override relative" style={{ width: '800px', boxSizing: 'border-box' }}>
+-              <PrintPreview record={record} />
+-           </div>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-function PrintPreview({ record }) {
+-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${record.id}`;
+-  const thuocItems = record.items.filter(item => item.type === 'THUOC');
+-  const vtytItems = record.items.filter(item => item.type === 'VTYT');
+-  let rowCounter = 1;
+-  const hasHistory = record.items.some(i => i.returnHistory?.length > 0);
+-
+-  return (
+-    <div id="print-area" className="bg-white text-black p-8 mx-auto" style={{ width: '800px', fontFamily: '"Times New Roman", Times, serif' }}>
+-      <div className="flex justify-between items-start mb-6 border-b border-slate-400 pb-4">
+-        <div className="flex items-center gap-3">
+-          <img crossOrigin="anonymous" src="https://i.postimg.cc/C5Wxpbrw/download.png" alt="Logo BV" className="h-16 w-16" />
+-          <div><h2 className="font-bold text-lg uppercase m-0 p-0">KHOA DƯỢC</h2><p className="text-sm font-semibold m-0 p-0">Hệ thống quản lý mượn thuốc</p></div>
+-        </div>
+-        <div className="text-center pr-4">
+-          <img crossOrigin="anonymous" src={qrUrl} alt="QR Code" className="w-20 h-20 mx-auto" />
+-          <p className="text-xs mt-1 font-mono m-0 p-0">{record.id}</p>
+-        </div>
+-      </div>
+-
+-      <div className="text-center mb-6">
+-        <h1 className="text-2xl font-bold uppercase m-0 mb-1">PHIẾU MƯỢN THUỐC / VTYT</h1>
+-        <p className="text-sm italic m-0">Thời gian tạo: {new Date(record.createdAt).toLocaleString('vi-VN')}</p>
+-      </div>
+-
+-      <div className="mb-6 space-y-2 text-sm">
+-        <p className="m-0"><strong>Người giao (Khoa Dược):</strong> {record.lenderName || '..........................'} - <strong>SĐT:</strong> {record.lenderPhone || '..........................'}</p>
+-        <p className="m-0"><strong>Người nhận ({record.department}):</strong> {record.borrowerName} - <strong>SĐT:</strong> {record.borrowerPhone || '..........................'}</p>
+-      </div>
+-
+-      <table className="w-full text-left text-sm border-collapse mb-8 border border-black">
+-        <thead>
+-          <tr>
+-            <th className="border border-black p-2 text-center">STT</th>
+-            <th className="border border-black p-2 text-center">Mã</th>
+-            <th className="border border-black p-2">Thuốc / VTYT</th>
+-            <th className="border border-black p-2 text-center">Nguồn</th>
+-            <th className="border border-black p-2 text-center">SL</th>
+-            <th className="border border-black p-2 text-center">ĐVT</th>
+-            {hasHistory && <th className="border border-black p-2">Lịch sử trả</th>}
+-          </tr>
+-        </thead>
+-        <tbody>
+-          {[...thuocItems, ...vtytItems].map(item => {
+-            const retQty = item.returnedQty || 0;
+-            return (
+-              <tr key={item.id}>
+-                <td className="border border-black p-2 text-center">{rowCounter++}</td>
+-                <td className="border border-black p-2 text-center font-mono text-xs">{item.id}</td>
+-                <td className="border border-black p-2">
+-                  <span className="font-bold">{item.name}</span>
+-                  {item.activeIngredient && <span className="ml-1">({item.activeIngredient})</span>}
+-                </td>
+-                <td className="border border-black p-2 text-center font-bold">
+-                  {/* Sử dụng style cứng cho bản in để giữ nền màu */}
+-                  <span style={{ 
+-                    backgroundColor: item.category === 'BH' ? '#3b82f6' : '#ec4899', 
+-                    color: 'white', 
+-                    padding: '2px 6px', 
+-                    borderRadius: '4px', 
+-                    fontSize: '10px',
+-                    WebkitPrintColorAdjust: 'exact', 
+-                    printColorAdjust: 'exact' 
+-                  }}>{item.category}</span>
+-                </td>
+-                <td className="border border-black p-2 text-center font-bold">{item.borrowQty}</td>
+-                <td className="border border-black p-2 text-center">{item.unit}</td>
+-                {hasHistory && (
+-                  <td className="border border-black p-2 text-xs">
+-                    {item.returnHistory?.map((h,i) => {
+-                      const ev = record.returnEvents?.find(e => e.session === h.session);
+-                      return (
+-                      <div key={i} className="mb-1 pb-1 border-b border-dashed border-slate-300 last:border-0 flex justify-between items-center">
+-                        <div>
+-                          - Lần {h.session}: <b>{h.qty}</b> <br/>
+-                          <i className="text-slate-500 text-[9px]">({new Date(h.date).toLocaleString('vi-VN')})</i>
+-                        </div>
+-                        {ev?.processorSignature ? (
+-                          <div className="flex flex-col items-center ml-2">
+-                            <img crossOrigin="anonymous" src={ev.processorSignature} alt="sig" className="h-5 object-contain" />
+-                          </div>
+-                        ) : <span className="text-[9px] ml-2">{h.processor}</span>}
+-                      </div>
+-                    )})}
+-                    <div className="mt-1 font-bold pt-1 border-t border-slate-300">{item.borrowQty === 0 ? 'Từ chối' : retQty >= item.borrowQty ? '✓ Đủ' : `⚠ Nợ ${item.borrowQty - retQty}`}</div>
+-                  </td>
+-                )}
+-              </tr>
+-            );
+-          })}
+-        </tbody>
+-      </table>
+-
+-      <div className="flex justify-between px-10 text-sm mb-20 mt-10">
+-        <div className="text-center w-1/2 flex flex-col items-center">
+-          <p className="font-bold m-0">Người giao (Khoa Dược)</p>
+-          <p className="italic text-xs mt-1 mb-2">(Ký, ghi rõ họ tên)</p>
+-          {record.lenderSignature ? (
+-             <>
+-               <img crossOrigin="anonymous" src={record.lenderSignature} alt="CK" className="h-16 object-contain" />
+-               <p className="text-[10px] text-slate-500 mt-1 m-0">Ký điện tử: {record.lenderName}<br/>{record.approvedAt ? new Date(record.approvedAt).toLocaleString('vi-VN') : ''}</p>
+-             </>
+-          ) : <div className="h-16"></div>}
+-          <p className="mt-2 font-medium m-0">{record.lenderName || '....................'}</p>
+-        </div>
+-        <div className="text-center w-1/2 flex flex-col items-center">
+-          <p className="font-bold m-0">Người nhận ({record.department})</p>
+-          <p className="italic text-xs mt-1 mb-2">(Ký, ghi rõ họ tên)</p>
+-          {record.borrowerSignature ? (
+-             <>
+-               <img crossOrigin="anonymous" src={record.borrowerSignature} alt="CK" className="h-16 object-contain" />
+-               <p className="text-[10px] text-slate-500 mt-1 m-0">Ký điện tử: {record.borrowerName}<br/>{new Date(record.createdAt).toLocaleString('vi-VN')}</p>
+-             </>
+-          ) : <div className="h-16"></div>}
+-          <p className="mt-2 font-medium m-0">{record.borrowerName}</p>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- LOGS VIEWER ---
+-function LogsViewer({ logs, onViewRecord }) {
+-  return (
+-    <div className="bg-white rounded-xl shadow-sm border p-4">
+-      <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><History size={20} /> Nhật ký hệ thống</h2>
+-      <div className="overflow-x-auto">
+-        <table className="w-full text-left text-sm whitespace-nowrap">
+-          <thead className="bg-slate-50 border-b">
+-            <tr>
+-              <th className="p-3">Thời gian</th><th className="p-3">Người dùng</th><th className="p-3">Khoa / Phòng</th>
+-              <th className="p-3">Thao tác</th><th className="p-3">Chi tiết</th><th className="p-3 text-right">Hành động</th>
+-            </tr>
+-          </thead>
+-          <tbody className="divide-y">
+-            {logs.map(log => (
+-              <tr key={log.id} className="hover:bg-slate-50">
+-                <td className="p-3 text-slate-500">{new Date(log.time).toLocaleString('vi-VN')}</td>
+-                <td className="p-3 font-medium">{log.user}</td>
+-                <td className="p-3 text-slate-600">{log.department}</td>
+-                <td className="p-3"><span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">{log.action}</span></td>
+-                <td className="p-3 text-slate-700">{log.details}</td>
+-                <td className="p-3 text-right">
+-                  {log.recordId && <button onClick={() => onViewRecord(log.recordId)} className="text-blue-600 font-medium">Xem phiếu</button>}
+-                </td>
+-              </tr>
+-            ))}
+-          </tbody>
+-        </table>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// --- SETTINGS & ADMIN ---
+-function SettingsManager({ user, updateUserSession, usersData, setUsersData, onResetData, showToast }) {
+-  const isAdmin = user.permissions.includes('ADMIN') || user.role === 'DUOC';
+-  const [activeSetting, setActiveSetting] = useState('PROFILE');
+-
+-  const [profName, setProfName] = useState(user.name);
+-  const [profPhone, setProfPhone] = useState(user.phone || '');
+-  const [profEmail, setProfEmail] = useState(user.email || '');
+-  const [showSigPad, setShowSigPad] = useState(false);
+-
+-  const [oldPass, setOldPass] = useState('');
+-  const [newPass, setNewPass] = useState('');
+-
+-  const handleUpdateProfile = (e) => {
+-    e.preventDefault();
+-    setUsersData(usersData.map(u => u.username === user.username ? { ...u, name: profName, phone: profPhone, email: profEmail } : u));
+-    updateUserSession({ name: profName, phone: profPhone, email: profEmail });
+-    showToast('Đã cập nhật thông tin cá nhân!');
+-  };
+-
+-  const handleSaveSignature = (sigData) => {
+-    setUsersData(usersData.map(u => u.username === user.username ? { ...u, signature: sigData, signatureStatus: 'PENDING' } : u));
+-    updateUserSession({ signature: sigData, signatureStatus: 'PENDING' });
+-    showToast('Chữ ký đã được lưu và gửi chờ phê duyệt!');
+-    setShowSigPad(false);
+-  };
+-
+-  const approveSignature = (username) => {
+-    setUsersData(usersData.map(u => u.username === username ? { ...u, signatureStatus: 'APPROVED' } : u));
+-    if (user.username === username) updateUserSession({ signatureStatus: 'APPROVED' });
+-    showToast(`Đã duyệt chữ ký cho ${username}`);
+-  };
+-  
+-  const rejectSignature = (username) => {
+-    setUsersData(usersData.map(u => u.username === username ? { ...u, signature: null, signatureStatus: 'NONE' } : u));
+-    if (user.username === username) updateUserSession({ signature: null, signatureStatus: 'NONE' });
+-    showToast(`Đã từ chối chữ ký của ${username}`);
+-  };
+-
+-  const pendingSigs = usersData.filter(u => u.signatureStatus === 'PENDING');
+-
+-  return (
+-    <div className="bg-white rounded-xl shadow-sm border p-4 md:p-8 max-w-6xl mx-auto">
+-      <h2 className="text-2xl font-bold flex items-center gap-2 mb-6 text-slate-800">
+-        <Settings size={28} className="text-blue-600" /> Cài đặt & Quản lý
+-      </h2>
+-      <div className="flex flex-col md:flex-row gap-8">
+-        <div className="w-full md:w-64 flex flex-col gap-2 shrink-0">
+-          <button onClick={() => setActiveSetting('PROFILE')} className={`p-3 rounded-lg text-left font-medium transition-colors flex items-center gap-3 ${activeSetting === 'PROFILE' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'hover:bg-slate-50 text-slate-600'}`}>
+-            <UserCircle size={18} /> Hồ sơ cá nhân
+-          </button>
+-          
+-          {isAdmin && (
+-            <>
+-              <div className="h-px bg-slate-200 my-2"></div>
+-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3">Quản Trị</p>
+-              <button onClick={() => setActiveSetting('SIGS')} className={`p-3 rounded-lg text-left font-medium transition-colors flex items-center gap-3 ${activeSetting === 'SIGS' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'hover:bg-slate-50 text-slate-600'}`}>
+-                <PenTool size={18} /> Duyệt chữ ký số {pendingSigs.length > 0 && <span className="bg-red-500 text-white rounded-full px-1.5 text-xs">{pendingSigs.length}</span>}
+-              </button>
+-              <button onClick={() => setActiveSetting('DATA')} className={`p-3 rounded-lg text-left font-medium transition-colors flex items-center gap-3 ${activeSetting === 'DATA' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'hover:bg-slate-50 text-slate-600'}`}>
+-                <Database size={18} /> Khởi tạo dữ liệu
+-              </button>
+-            </>
+-          )}
+-        </div>
+-
+-        <div className="flex-1 min-w-0">
+-          {activeSetting === 'PROFILE' && (
+-            <div className="animate-in fade-in max-w-lg space-y-6">
+-               <div className="border p-6 rounded-xl bg-slate-50">
+-                 <h3 className="text-lg font-bold border-b pb-2 mb-4">Chữ ký số</h3>
+-                 <div className="flex items-center gap-6 mb-4">
+-                    <div className="h-24 w-48 bg-white border-2 border-dashed border-slate-300 rounded flex items-center justify-center">
+-                       {user.signature ? <img src={user.signature} alt="CK" className="h-full object-contain p-2" /> : <span className="text-slate-400 text-sm">Chưa có chữ ký</span>}
+-                    </div>
+-                    <div>
+-                       <p className="text-sm text-slate-600 mb-1">Trạng thái:</p>
+-                       {user.signatureStatus === 'APPROVED' ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 font-bold rounded text-xs flex items-center gap-1 w-max"><Check size={14}/> Đã duyệt hợp lệ</span> :
+-                        user.signatureStatus === 'PENDING' ? <span className="px-2 py-1 bg-amber-100 text-amber-700 font-bold rounded text-xs flex items-center gap-1 w-max"><Clock size={14}/> Đang chờ duyệt</span> :
+-                        <span className="px-2 py-1 bg-slate-200 text-slate-600 font-bold rounded text-xs w-max">Chưa khởi tạo</span>}
+-                    </div>
+-                 </div>
+-                 <button onClick={() => setShowSigPad(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-sm shadow-sm">
+-                    {user.signature ? 'Ký lại chữ ký khác' : 'Tạo chữ ký số'}
+-                 </button>
+-               </div>
+-
+-               <div className="border p-6 rounded-xl bg-slate-50">
+-                 <h3 className="text-lg font-bold border-b pb-2 mb-4">Thông tin cá nhân</h3>
+-                 <form onSubmit={handleUpdateProfile} className="space-y-4">
+-                    <div><label className="block text-sm font-medium mb-1">Họ và Tên</label><input required type="text" value={profName} onChange={e=>setProfName(e.target.value)} className="w-full p-2 border rounded" /></div>
+-                    <div><label className="block text-sm font-medium mb-1">SĐT</label><input type="text" value={profPhone} onChange={e=>setProfPhone(e.target.value)} className="w-full p-2 border rounded" /></div>
+-                    <button type="submit" className="w-full py-2 bg-slate-800 text-white rounded font-bold">Lưu thông tin</button>
+-                 </form>
+-               </div>
+-            </div>
+-          )}
+-
+-          {activeSetting === 'SIGS' && isAdmin && (
+-            <div className="animate-in fade-in">
+-              <h3 className="text-lg font-bold border-b pb-2 mb-4">Yêu cầu duyệt chữ ký</h3>
+-              {pendingSigs.length === 0 ? (
+-                <p className="text-slate-500 italic">Không có yêu cầu chờ duyệt nào.</p>
+-              ) : (
+-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+-                  {pendingSigs.map(u => (
+-                    <div key={u.username} className="border p-4 rounded-xl shadow-sm bg-white">
+-                      <p className="font-bold text-blue-700 mb-1">{u.name} <span className="text-xs text-slate-500 font-normal">({u.username})</span></p>
+-                      <div className="h-20 bg-slate-50 border rounded mb-3 flex items-center justify-center p-1">
+-                        <img src={u.signature} alt="CK" className="h-full object-contain" />
+-                      </div>
+-                      <div className="flex gap-2">
+-                        <button onClick={() => approveSignature(u.username)} className="flex-1 py-1.5 bg-emerald-600 text-white font-bold rounded text-sm">Phê duyệt</button>
+-                        <button onClick={() => rejectSignature(u.username)} className="flex-1 py-1.5 bg-red-100 text-red-600 font-bold rounded text-sm hover:bg-red-200">Từ chối</button>
+-                      </div>
+-                    </div>
+-                  ))}
+-                </div>
+-              )}
+-            </div>
+-          )}
+-
+-          {activeSetting === 'DATA' && isAdmin && (
+-            <div className="animate-in fade-in max-w-md">
+-              <div className="border border-amber-200 rounded-xl p-6 bg-amber-50 shadow-sm">
+-                <h3 className="font-bold text-lg mb-2 text-amber-700">Dữ liệu thử nghiệm</h3>
+-                <p className="text-sm text-slate-600 mb-4">Xóa toàn bộ phiếu mượn và nhật ký hệ thống hiện tại. Tài khoản và chữ ký không bị mất.</p>
+-                <button onClick={onResetData} className="w-full py-2 bg-amber-500 text-white rounded-lg font-bold shadow-sm">Khởi tạo lại CSDL</button>
+-              </div>
+-            </div>
+-          )}
+-        </div>
+-      </div>
+-      {showSigPad && <SignaturePad onSave={handleSaveSignature} onClose={() => setShowSigPad(false)} />}
+-    </div>
+-  );
+-}
+ 
+-function NavButton({ active, onClick, icon, label }) {
+-  return (
+-    <button 
+-      onClick={onClick}
+-      className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${active ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+-    >
+-      {icon} {label}
+-    </button>
+-  );
+-}
++      bootApp();
++    </script>
++  </body>
++</html>
+ 
+EOF
+)
